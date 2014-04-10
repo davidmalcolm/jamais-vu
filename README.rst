@@ -1,3 +1,6 @@
+jv (for "jamais-vu") is a tool for working with the output of
+`DejaGnu <http://www.gnu.org/software/dejagnu/>`_.
+
 jv implements various subcommands, rather like "git", "svn", "yum", etc,
 using Python's `cmdln <https://pypi.python.org/pypi/cmdln>`_ package::
 
