@@ -63,6 +63,17 @@ class DejaFile:
                     self.outcome_to_testnames[outcome].add(testname)
                     break # OUTCOMES loop
 
+    def find(self, testname):
+        if testname in self.testname_to_outcome:
+            print('%s:%i: %s: %s'
+                  % (self.path,
+                     self.testname_to_lineidx[testname] + 1,
+                     self.testname_to_outcome[testname],
+                     testname))
+            return 1
+        else:
+            return 0
+
 class LogFile(DejaFile):
     """
     A .log file from dejagnu
@@ -80,14 +91,16 @@ class SumFile(DejaFile):
     def __init__(self, path, parse_log_file=False):
         DejaFile.__init__(self, path)
 
-        if parse_log_file:
-            # Locate the .log file that this is a summary of:
-            root, ext = os.path.splitext(path)
-            self.logpath = root + '.log'
-            if os.path.exists(self.logpath):
-                self.logfile = LogFile(self.logpath)
-            else:
-                self.logfile = None
+        # Locate the .log file that this is a summary of:
+        root, ext = os.path.splitext(path)
+        self.logpath = root + '.log'
+
+        # ...but don't parse it yet, as that's expensive:
+        self.logfile = None
+
+    def load_log_file(self):
+        if not self.logfile:
+            self.logfile = LogFile(self.logpath)
 
     def __repr__(self):
         return 'SumFile(%r)' % self.path
@@ -97,6 +110,15 @@ class SumFile(DejaFile):
 
     def relative_path(self, basedir):
         return os.path.relpath(self.path, basedir)
+
+    def find(self, testname):
+        count = DejaFile.find(self, testname)
+        if count:
+            # Also find within .log file:
+            self.load_log_file()
+            count += self.logfile.find(testname)
+
+        return count
 
     def summarize(self, tr):
         tr.begin_section(self.path)
@@ -151,6 +173,12 @@ class TestRun:
                     tr.writeln(testname)
                 tr.end_section()
             tr.end_section()
+
+    def find(self, testname):
+        count = 0
+        for sumfile in sorted(self.sumfiles):
+            count += sumfile.find(testname)
+        return count
 
     def summarize(self, tr):
         for sumfile in sorted(self.sumfiles):
@@ -300,6 +328,26 @@ class JV(cmdln.Cmdln):
             run = TestRun(path)
             tr = TextReporter()
             run.dump(tr)
+
+    def do_find(self, subcmd, opts, testname, *paths):
+        """
+        Locate a test, by name, in the given .sum files or directories.
+
+        If a test is located in a .sum file, jv will also look for the
+        test in the corresponding .log file.
+
+        Example:
+          ./jv find \
+            "c-c++-common/Wcast-qual-1.c -std=gnu++11  (test for warnings, line 100)" \
+            testdata/control
+
+        Return the number of matches found
+        """
+        count = 0
+        for path in paths:
+            run = TestRun(path)
+            count += run.find(testname)
+        return count
 
     def do_summarize(self, subcmd, opts, *paths):
         """

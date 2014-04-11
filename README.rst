@@ -15,6 +15,7 @@ using Python's `cmdln <https://pypi.python.org/pypi/cmdln>`_ package::
   Commands:
       compare        Compare a "before" run to an "after" run. Accepts a pair...
       dump           Print a dump of one or more .sum files, or directories, ...
+      find           Locate a test, by name, in the given .sum files or direc...
       help (?)       give detailed help on a specific sub-command
       summarize      Print a short summary of one or more .sum files or direc...
 
@@ -242,3 +243,32 @@ Comparing a before/after pair of GCC builds, where lots of things broke::
    PASS: c-c++-common/Wconversion-real.c -std=gnu++11  (test for warnings, line 25)
   (etc; snipped)
 
+
+Locating specific tests
+-----------------------
+The "find" subcommand will search for a test by name within .sum files
+or directories.
+
+If a test is located in a .sum file, jv will also look for the
+test in the corresponding .log file.
+
+The output contains the filename and line number, e.g. for easy navigation
+to the pertinent lines of the log file from Emacs.  This may help with
+determining how to reproduce a particular result.
+
+The exit code is the total number of matches found (within both .sum and
+.log files).
+
+An exact match is required.
+
+Example::
+
+  ./jv find "c-c++-common/asan/attrib-1.c  -O0   (test for warnings, line 58)" testdata/test
+  testdata/test/control/build/gcc/testsuite/g++/g++.sum:11: PASS: c-c++-common/asan/attrib-1.c  -O0   (test for warnings, line 58)
+  testdata/test/control/build/gcc/testsuite/g++/g++.log:34: PASS: c-c++-common/asan/attrib-1.c  -O0   (test for warnings, line 58)
+  testdata/test/control/build/gcc/testsuite/gcc/gcc.sum:41766: PASS: c-c++-common/asan/attrib-1.c  -O0   (test for warnings, line 58)
+  testdata/test/control/build/gcc/testsuite/gcc/gcc.log:123253: PASS: c-c++-common/asan/attrib-1.c  -O0   (test for warnings, line 58)
+  testdata/test/experiment/build/gcc/testsuite/g++/g++.sum:11: PASS: c-c++-common/asan/attrib-1.c  -O0   (test for warnings, line 58)
+  testdata/test/experiment/build/gcc/testsuite/g++/g++.log:34: PASS: c-c++-common/asan/attrib-1.c  -O0   (test for warnings, line 58)
+  testdata/test/experiment/build/gcc/testsuite/gcc/gcc.sum:41766: PASS: c-c++-common/asan/attrib-1.c  -O0   (test for warnings, line 58)
+  testdata/test/experiment/build/gcc/testsuite/gcc/gcc.log:123253: PASS: c-c++-common/asan/attrib-1.c  -O0   (test for warnings, line 58)
