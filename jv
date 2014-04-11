@@ -19,6 +19,7 @@
 # Tool for working with DejaGnu output
 
 import os
+import re
 import sys
 
 import cmdln  # in Fedora as "python-cmdln"
@@ -50,13 +51,17 @@ class DejaFile:
         # Mapping from test name to line index
         self.testname_to_lineidx = {}
 
+        # gcc/testsuite/ada/acats/acats.sum uses a tab rather than a space
+        # e.g. 'PASS:\ta22006b\n'
+        PATTERN_PAIRS = [(outcome, re.compile('^%s:\s+(\S.*)$' % outcome))
+                         for outcome in OUTCOMES]
         # Parse the file and build the above dicts:
         for idx, line in enumerate(open(self.path)):
             #print(repr((idx, line)))
-            for outcome in OUTCOMES:
-                prefix = '%s: ' % outcome
-                if line.startswith(prefix):
-                    testname = line[len(prefix):].rstrip()
+            for outcome, PATTERN in PATTERN_PAIRS:
+                m = re.match(PATTERN, line)
+                if m:
+                    testname = m.group(1).rstrip()
                     #print(testname)
                     self.testname_to_outcome[testname] = outcome
                     self.testname_to_lineidx[testname] = idx
