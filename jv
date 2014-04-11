@@ -263,10 +263,35 @@ class JV(cmdln.Cmdln):
         # Compare .sum files for which there are matching peers:
         tr.begin_section('Comparing %i common .sum files'
                          % len(relpathsA & relpathsB))
+
+        # Initial summary:
         for relpath in sorted(relpathsA & relpathsB):
-            tr.writeln(relpath)
+            sumfileA = dict_by_rel_pathA[relpath]
+            sumfileB = dict_by_rel_pathB[relpath]
+
+            def make_count_text(desc, countA, countB):
+                if countA == countB:
+                    return (' %s: %i'
+                            % (desc, countA))
+                else:
+                    diff = countB - countA
+                    return (' %s: %i->%i (%s)'
+                            % (desc, countA, countB,
+                               ('+%i' % diff if diff > 0 else '%i' % diff)))
+
+            outcome_text = make_count_text('total',
+                                           len(sumfileA.testname_to_outcome),
+                                           len(sumfileB.testname_to_outcome))
+
+            for outcome in OUTCOMES:
+                countA = len(sumfileA.outcome_to_testnames[outcome])
+                countB = len(sumfileB.outcome_to_testnames[outcome])
+                if countA or countB:
+                    outcome_text += make_count_text(outcome, countA, countB)
+            tr.writeln('%s :%s' % (relpath, outcome_text))
         tr.end_section()
 
+        # Detailed comparison:
         for relpath in sorted(relpathsA & relpathsB):
             sumfileA = dict_by_rel_pathA[relpath]
             sumfileB = dict_by_rel_pathB[relpath]

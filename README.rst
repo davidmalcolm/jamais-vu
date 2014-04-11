@@ -137,15 +137,15 @@ Comparing a before/after pair of GCC builds, where nothing changed::
   Comparing 9 common .sum files
   -----------------------------
 
-   build/gcc/testsuite/g++/g++.sum
-   build/gcc/testsuite/gcc/gcc.sum
-   build/gcc/testsuite/gfortran/gfortran.sum
-   build/gcc/testsuite/objc/objc.sum
-   build/x86_64-unknown-linux-gnu/boehm-gc/testsuite/boehm-gc.sum
-   build/x86_64-unknown-linux-gnu/libatomic/testsuite/libatomic.sum
-   build/x86_64-unknown-linux-gnu/libffi/testsuite/libffi.sum
-   build/x86_64-unknown-linux-gnu/libgomp/testsuite/libgomp.sum
-   build/x86_64-unknown-linux-gnu/libstdc++-v3/testsuite/libstdc++.sum
+   build/gcc/testsuite/g++/g++.sum : total: 59534 PASS: 58218 XFAIL: 292 UNSUPPORTED: 1024
+   build/gcc/testsuite/gcc/gcc.sum : total: 101097 FAIL: 56 PASS: 99153 XFAIL: 248 XPASS: 2 UNSUPPORTED: 1638
+   build/gcc/testsuite/gfortran/gfortran.sum : total: 29292 FAIL: 15458 PASS: 11246 XFAIL: 30 UNTESTED: 1752 UNRESOLVED: 53 UNSUPPORTED: 753
+   build/gcc/testsuite/objc/objc.sum : total: 1557 FAIL: 984 PASS: 471 UNRESOLVED: 4 UNSUPPORTED: 98
+   build/x86_64-unknown-linux-gnu/boehm-gc/testsuite/boehm-gc.sum : total: 13 PASS: 12 UNSUPPORTED: 1
+   build/x86_64-unknown-linux-gnu/libatomic/testsuite/libatomic.sum : total: 54 PASS: 54
+   build/x86_64-unknown-linux-gnu/libffi/testsuite/libffi.sum : total: 1856 PASS: 1801 UNSUPPORTED: 55
+   build/x86_64-unknown-linux-gnu/libgomp/testsuite/libgomp.sum : total: 621 PASS: 621
+   build/x86_64-unknown-linux-gnu/libstdc++-v3/testsuite/libstdc++.sum : total: 10055 FAIL: 1 PASS: 9792 XFAIL: 40 UNSUPPORTED: 222
 
   No differences found in 9 common .sum files
 
@@ -230,10 +230,10 @@ Comparing a before/after pair of GCC builds, where lots of things broke::
   Comparing 4 common .sum files
   -----------------------------
   
-   gcc/testsuite/ada/acats/acats.sum
-   gcc/testsuite/g++/g++.sum
-   gcc/testsuite/gcc/gcc.sum
-   gcc/testsuite/gnat/gnat.sum
+   gcc/testsuite/ada/acats/acats.sum : total: 2320->0 (-2320) PASS: 2320->0 (-2320)
+   gcc/testsuite/g++/g++.sum : total: 89697->78686 (-11011) FAIL: 3->63613 (+63610) PASS: 86259->1484 (-84775) XFAIL: 439->287 (-152) XPASS: 0->119 (+119) UNRESOLVED: 0->9645 (+9645) UNSUPPORTED: 2996->3623 (+627)
+   gcc/testsuite/gcc/gcc.sum : total: 109955->92609 (-17346) FAIL: 33->61520 (+61487) PASS: 107818->1157 (-106661) XFAIL: 263->33 (-230) XPASS: 40->20 (-20) UNRESOLVED: 0->25568 (+25568) UNSUPPORTED: 1801->4469 (+2668)
+   gcc/testsuite/gnat/gnat.sum : total: 1244->1243 (-1) FAIL: 0->66 (+66) PASS: 1223->785 (-438) XFAIL: 18->0 (-18) XPASS: 0->18 (+18) UNRESOLVED: 0->370 (+370) UNSUPPORTED: 3->4 (+1)
   
   Tests that went away in gcc/testsuite/g++/g++.sum: 20615
   --------------------------------------------------------
