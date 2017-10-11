@@ -246,8 +246,8 @@ Comparing a before/after pair of GCC builds, where lots of things broke::
 
 Locating specific tests
 -----------------------
-The "find" subcommand will search for a test by name within .sum files
-or directories.
+The "find" subcommand will search for tests by name within .sum files
+or directories, looking for a match with the given substring.
 
 If a test is located in a .sum file, jv will also look for the
 test in the corresponding .log file.
@@ -258,8 +258,6 @@ determining how to reproduce a particular result.
 
 The exit code is the total number of matches found (within both .sum and
 .log files).
-
-An exact match is required.
 
 Example::
 

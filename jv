@@ -68,16 +68,18 @@ class DejaFile:
                     self.outcome_to_testnames[outcome].add(testname)
                     break # OUTCOMES loop
 
-    def find(self, testname):
-        if testname in self.testname_to_outcome:
-            print('%s:%i: %s: %s'
-                  % (self.path,
-                     self.testname_to_lineidx[testname] + 1,
-                     self.testname_to_outcome[testname],
-                     testname))
-            return 1
-        else:
-            return 0
+    def find(self, search_testname):
+        result = 0
+        for cand_testname in sorted(self.testname_to_outcome):
+            # substring matches
+            if search_testname in cand_testname:
+                print('%s:%i: %s: %s'
+                      % (self.path,
+                         self.testname_to_lineidx[cand_testname] + 1,
+                         self.testname_to_outcome[cand_testname],
+                         cand_testname))
+                result += 1
+        return result
 
 class LogFile(DejaFile):
     """
