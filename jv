@@ -295,15 +295,19 @@ class JV(cmdln.Cmdln):
             sumfileA = dict_by_rel_pathA[relpath]
             sumfileB = dict_by_rel_pathB[relpath]
 
-            def make_count_text(desc, countA, countB):
+            def make_count_text(desc, countA, countB, with_percent=False):
                 if countA == countB:
                     return (' %s: %i'
                             % (desc, countA))
                 else:
                     diff = countB - countA
-                    return (' %s: %i->%i (%s)'
-                            % (desc, countA, countB,
-                               ('+%i' % diff if diff > 0 else '%i' % diff)))
+                    result = (' %s: %i->%i (%s)'
+                              % (desc, countA, countB,
+                                 ('+%i' % diff if diff > 0 else '%i' % diff)))
+                    if with_percent:
+                        percent = countB * 100. / countA
+                        result += ' %2.2f%%' % percent
+                    return result
 
             outcome_text = make_count_text('total',
                                            len(sumfileA.testname_to_outcome),
@@ -377,7 +381,8 @@ class JV(cmdln.Cmdln):
                 countA = total_by_outcomeA[outcome]
                 countB = total_by_outcomeB[outcome]
                 if countA or countB:
-                    tr.writeln(make_count_text(outcome, countA, countB))
+                    tr.writeln(make_count_text(outcome, countA, countB,
+                                               outcome == 'PASS'))
             tr.end_section()
 
         return issue_count
