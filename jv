@@ -81,6 +81,9 @@ class DejaFile:
                 result += 1
         return result
 
+    def get_count_by_outcome(self, outcome):
+        return len(self.outcome_to_testnames[outcome])
+
 class LogFile(DejaFile):
     """
     A .log file from dejagnu
@@ -175,7 +178,7 @@ class TestRun:
             tr.begin_section(sumfile.path)
             for outcome in OUTCOMES:
                 tr.begin_section('%s: %i tests'
-                                 % (outcome, len(sumfile.outcome_to_testnames[outcome])))
+                                 % (outcome, sumfile.get_count_by_outcome (outcome)))
                 for testname in sorted(sumfile.outcome_to_testnames[outcome]):
                     tr.writeln(testname)
                 tr.end_section()
@@ -245,6 +248,14 @@ class JV(cmdln.Cmdln):
         #print('relpathsA: %r' % relpathsA)
         #print('relpathsB: %r' % relpathsB)
 
+        class TotalByOutcome(dict):
+            def __init__(self):
+                for outcome in OUTCOMES:
+                    self[outcome] = 0
+
+        total_by_outcomeA = TotalByOutcome()
+        total_by_outcomeB = TotalByOutcome()
+
         issue_count = 0
 
         tr = TextReporter()
@@ -254,7 +265,11 @@ class JV(cmdln.Cmdln):
             tr.begin_section('sum files that went away: %i'
                              % len(missing_relpaths))
             for relpath in sorted(missing_relpaths):
-                dict_by_rel_pathA[relpath].summarize(tr)
+                sumfileA = dict_by_rel_pathA[relpath]
+                sumfileA.summarize(tr)
+                for outcome in OUTCOMES:
+                    total_by_outcomeA[outcome] \
+                        += sumfileA.get_count_by_outcome(outcome)
                 issue_count += 1
             tr.end_section()
 
@@ -263,7 +278,11 @@ class JV(cmdln.Cmdln):
             tr.begin_section('sum files that appeared: %i'
                              % len(new_relpaths))
             for relpath in sorted(new_relpaths):
-                dict_by_rel_pathB[relpath].summarize(tr)
+                sumfileB = dict_by_rel_pathB[relpath]
+                sumfileB.summarize(tr)
+                for outcome in OUTCOMES:
+                    total_by_outcomeB[outcome] \
+                        += sumfileB.get_count_by_outcome(outcome)
                 issue_count += 1
             tr.end_section()
 
@@ -291,10 +310,12 @@ class JV(cmdln.Cmdln):
                                            len(sumfileB.testname_to_outcome))
 
             for outcome in OUTCOMES:
-                countA = len(sumfileA.outcome_to_testnames[outcome])
-                countB = len(sumfileB.outcome_to_testnames[outcome])
+                countA = sumfileA.get_count_by_outcome(outcome)
+                countB = sumfileB.get_count_by_outcome(outcome)
                 if countA or countB:
                     outcome_text += make_count_text(outcome, countA, countB)
+                total_by_outcomeA[outcome] += countA
+                total_by_outcomeB[outcome] += countB
             tr.writeln('%s :%s' % (relpath, outcome_text))
         tr.end_section()
 
@@ -348,6 +369,16 @@ class JV(cmdln.Cmdln):
         if relpathsA & relpathsB and issue_count == 0:
             tr.writeln('No differences found in %i common .sum files'
                        % len(relpathsA & relpathsB))
+        else:
+            tr.begin_section('Summary')
+            tr.writeln(make_count_text('# of .sum files',
+                                       len(relpathsA), len(relpathsB)))
+            for outcome in OUTCOMES:
+                countA = total_by_outcomeA[outcome]
+                countB = total_by_outcomeB[outcome]
+                if countA or countB:
+                    tr.writeln(make_count_text(outcome, countA, countB))
+            tr.end_section()
 
         return issue_count
 
