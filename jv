@@ -18,6 +18,7 @@
 
 # Tool for working with DejaGnu output
 
+from collections import namedtuple
 import mock
 import os
 import re
@@ -33,6 +34,14 @@ OUTCOMES='FAIL PASS XFAIL KFAIL XPASS KPASS UNTESTED UNRESOLVED UNSUPPORTED'.spl
 # .sum and .log files
 ############################################################################
 
+class TestId(namedtuple('TestId', ['testname', 'index'])):
+    """
+    A (name, index) pair, identifying e.g. one instance of
+      'c-c++-common/pr83059.c  -std=c++11  (test for warnings, line 7)'
+    (for which there are several in the test .sum files)
+    """
+    pass
+
 class DejaFile:
     """
     Output from dejagnu, either a .log or a .sum file
@@ -41,18 +50,22 @@ class DejaFile:
         self.path = path
         # print('DejaFile(%r)' % self.path)
 
-        # Mapping from test name to outcome
-        # e.g. from 'libffi.call/closure_fn0.c -O0 -W -Wall (test for excess errors)'
+        # Mapping from TestId to outcome:
+        # e.g. from the zeroth occurrence of:
+        #   'libffi.call/closure_fn0.c -O0 -W -Wall (test for excess errors)'
         # to 'PASS'
-        self.testname_to_outcome = {}
+        self.testid_to_outcome = {}
 
-        # Mapping from outcome to set of test names
-        self.outcome_to_testnames = {}
+        # Mapping from outcome to set of TestId instances
+        self.outcome_to_testids = {}
         for outcome in OUTCOMES:
-            self.outcome_to_testnames[outcome] = set()
+            self.outcome_to_testids[outcome] = set()
 
-        # Mapping from test name to line index
-        self.testname_to_lineidx = {}
+        # Mapping from TestId to line index
+        self.testid_to_lineidx = {}
+
+        # Mapping from test name to last numeric index
+        self.testname_to_last_index = {}
 
         # gcc/testsuite/ada/acats/acats.sum uses a tab rather than a space
         # e.g. 'PASS:\ta22006b\n'
@@ -65,10 +78,16 @@ class DejaFile:
                 m = re.match(PATTERN, line)
                 if m:
                     testname = m.group(1).rstrip()
-                    #print(testname)
-                    self.testname_to_outcome[testname] = outcome
-                    self.testname_to_lineidx[testname] = idx
-                    self.outcome_to_testnames[outcome].add(testname)
+                    if testname in self.testname_to_last_index:
+                        next_index = self.testname_to_last_index[testname] + 1
+                    else:
+                        next_index = 0
+                    testid = TestId(testname, next_index)
+                    self.testname_to_last_index[testname] = next_index
+
+                    self.testid_to_outcome[testid] = outcome
+                    self.testid_to_lineidx[testid] = idx
+                    self.outcome_to_testids[outcome].add(testid)
                     break # OUTCOMES loop
 
     def find(self, search_testname):
@@ -85,7 +104,7 @@ class DejaFile:
         return result
 
     def get_count_by_outcome(self, outcome):
-        return len(self.outcome_to_testnames[outcome])
+        return len(self.outcome_to_testids[outcome])
 
 class LogFile(DejaFile):
     """
@@ -136,10 +155,9 @@ class SumFile(DejaFile):
     def summarize(self, tr):
         tr.begin_section(self.path)
         for outcome in OUTCOMES:
-            if self.outcome_to_testnames[outcome]:
+            if self.outcome_to_testids[outcome]:
                 tr.writeln('%s: %i tests'
-                           % (outcome,
-                              len(self.outcome_to_testnames[outcome])))
+                           % (outcome, self.get_count_by_outcome(outcome)))
         tr.end_section()
 
 class TestRun:
@@ -302,8 +320,8 @@ class Comparison:
             sumfileA = self.dict_by_rel_pathA[relpath]
             sumfileB = self.dict_by_rel_pathB[relpath]
             outcome_text = make_count_text('total',
-                                           len(sumfileA.testname_to_outcome),
-                                           len(sumfileB.testname_to_outcome))
+                                           len(sumfileA.testid_to_outcome),
+                                           len(sumfileB.testid_to_outcome))
             for outcome in OUTCOMES:
                 countA = sumfileA.get_count_by_outcome(outcome)
                 countB = sumfileB.get_count_by_outcome(outcome)
@@ -319,44 +337,44 @@ class Comparison:
             sumfileB = self.dict_by_rel_pathB[relpath]
 
             # Compare the individual tests
-            testnamesA = set(sumfileA.testname_to_outcome.keys())
-            testnamesB = set(sumfileB.testname_to_outcome.keys())
-            missing_testnames = testnamesA - testnamesB
-            if missing_testnames:
+            testidsA = set(sumfileA.testid_to_outcome.keys())
+            testidsB = set(sumfileB.testid_to_outcome.keys())
+            missing_testids = testidsA - testidsB
+            if missing_testids:
                 tr.begin_section('Tests that went away in %s: %i'
-                                 % (relpath, len(missing_testnames)))
-                for testname in sorted(missing_testnames):
+                                 % (relpath, len(missing_testids)))
+                for testid in sorted(missing_testids):
                     tr.writeln('%s: %s'
-                               % (sumfileA.testname_to_outcome[testname],
-                                  testname))
+                               % (sumfileA.testid_to_outcome[testid],
+                                  testid.testname))
                     self.issue_count += 1
                 tr.end_section()
 
-            new_testnames = testnamesB - testnamesA
-            if new_testnames:
+            new_testids = testidsB - testidsA
+            if new_testids:
                 tr.begin_section('Tests appeared in %s: %i'
-                                 % (relpath, len(new_testnames)))
-                for testname in sorted(new_testnames):
+                                 % (relpath, len(new_testids)))
+                for testid in sorted(new_testids):
                     tr.writeln('%s: %s'
-                               % (sumfileB.testname_to_outcome[testname],
-                                  testname))
+                               % (sumfileB.testid_to_outcome[testid],
+                                  testid.testname))
                     self.issue_count += 1
                 tr.end_section()
 
-            # dicts mapping from testname to (before, after) outcome pair
+            # dict mapping from testid to (before, after) outcome pairs
             changing = {}
-            for testname in sorted(testnamesA & testnamesB):
-                outcomeA = sumfileA.testname_to_outcome[testname]
-                outcomeB = sumfileB.testname_to_outcome[testname]
+            for testid in sorted(testidsA & testidsB):
+                outcomeA = sumfileA.testid_to_outcome[testid]
+                outcomeB = sumfileB.testid_to_outcome[testid]
                 if outcomeA != outcomeB:
-                    changing[testname] = (outcomeA, outcomeB)
+                    changing[testid] = (outcomeA, outcomeB)
             if changing:
                 tr.begin_section('Tests changing outcome in %s: %i'
                                  % (relpath, len(changing)))
-                for testname in sorted(changing.keys()):
-                    outcomeA, outcomeB = changing[testname]
+                for testid in sorted(changing.keys()):
+                    outcomeA, outcomeB = changing[testid]
                     tr.writeln('%s -> %s : %s'
-                               % (outcomeA, outcomeB, testname))
+                               % (outcomeA, outcomeB, testid.testname))
                     self.issue_count += 1
                 tr.end_section()
 
@@ -486,25 +504,35 @@ class TestSumFile(unittest.TestCase):
                          '---------------\n'
                          '\n'
                          ' FAIL: 8 tests\n'
-                         ' PASS: 118747 tests\n'
+                         ' PASS: 119872 tests\n'
                          ' XFAIL: 434 tests\n'
                          ' UNSUPPORTED: 4697 tests\n'
                          '\n')
 
     def test_get_count_by_outcome(self):
         self.assertEqual(self.sumfile.get_count_by_outcome('FAIL'), 8)
-        self.assertEqual(self.sumfile.get_count_by_outcome('PASS'), 118747)
+        self.assertEqual(self.sumfile.get_count_by_outcome('PASS'), 119872)
         self.assertEqual(self.sumfile.get_count_by_outcome('XFAIL'), 434)
         self.assertEqual(self.sumfile.get_count_by_outcome('UNSUPPORTED'), 4697)
         self.assertEqual(self.sumfile.get_count_by_outcome('UNRESOLVED'), 0)
 
-    def test_one_test(self):
+    def test_one_test_unique(self):
         TESTNAME \
             = 'c-c++-common/asan/alloca_big_alignment.c   -O0  execution test'
+        testid = TestId(TESTNAME, 0)
+        self.assertEqual(self.sumfile.testid_to_outcome[testid], 'PASS')
+        self.assertIn(testid, self.sumfile.outcome_to_testids['PASS'])
+        self.assertEqual(self.sumfile.testid_to_lineidx[testid], 21)
 
-        self.assertEqual(self.sumfile.testname_to_outcome[TESTNAME], 'PASS')
-        self.assertIn(TESTNAME, self.sumfile.outcome_to_testnames['PASS'])
-        self.assertEqual(self.sumfile.testname_to_lineidx[TESTNAME], 21)
+    def test_one_test_repeated(self):
+        TESTNAME \
+            = 'c-c++-common/pr83059.c  -std=c++11  (test for warnings, line 7)'
+        # There are 3 instances of this testname, each with PASS
+        for i in range(3):
+            testid = TestId(TESTNAME, i)
+            self.assertEqual(self.sumfile.testid_to_outcome[testid], 'PASS')
+            self.assertIn(testid, self.sumfile.outcome_to_testids['PASS'])
+            self.assertEqual(self.sumfile.testid_to_lineidx[testid], 18456 + i)
 
 class TestComparison(unittest.TestCase):
     @classmethod
@@ -529,8 +557,8 @@ class TestComparison(unittest.TestCase):
         with mock_stdout() as fake_stdout:
             tr = TextReporter()
             self.c.compare_sum_files(tr)
-        self.assertIn(' g++.sum : total: 123886->123896 (+10)'
-                      ' FAIL: 8->11 (+3) PASS: 118747->118757 (+10)'
+        self.assertIn(' g++.sum : total: 125011->125021 (+10)'
+                      ' FAIL: 8->11 (+3) PASS: 119872->119879 (+7)'
                       ' XFAIL: 434 UNSUPPORTED: 4697\n', fake_stdout.getvalue())
         self.assertIn('Tests that went away in g++.sum: 323\n',
                       fake_stdout.getvalue())
@@ -547,7 +575,7 @@ class TestComparison(unittest.TestCase):
                                   '\n'
                                   '  # of .sum files: 1\n'
                                   '  FAIL: 8->11 (+3)\n'
-                                  '  PASS: 118747->118757 (+10) 100.01%\n'
+                                  '  PASS: 119872->119879 (+7) 100.01%\n'
                                   '  XFAIL: 434\n'
                                   '  UNSUPPORTED: 4697\n'
                                   '\n')
