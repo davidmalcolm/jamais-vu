@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-#   Copyright 2014 David Malcolm <dmalcolm@redhat.com>
-#   Copyright 2014 Red Hat, Inc.
+#   Copyright 2014, 2017 David Malcolm <dmalcolm@redhat.com>
+#   Copyright 2014, 2017 Red Hat, Inc.
 #
 #   This is free software: you can redistribute it and/or modify it
 #   under the terms of the GNU General Public License as published by
@@ -18,9 +18,12 @@
 
 # Tool for working with DejaGnu output
 
+import mock
 import os
 import re
 import sys
+import StringIO
+import unittest
 
 import cmdln  # in Fedora as "python-cmdln"
 
@@ -36,7 +39,7 @@ class DejaFile:
     """
     def __init__(self, path):
         self.path = path
-        # print(self.path)
+        # print('DejaFile(%r)' % self.path)
 
         # Mapping from test name to outcome
         # e.g. from 'libffi.call/closure_fn0.c -O0 -W -Wall (test for excess errors)'
@@ -158,11 +161,12 @@ class TestRun:
                         # print(sf.logfile.outcome_to_testnames)
                         self.sumfiles.append(sf)
             os.path.walk(path, visit, None)
-        else:
+        elif path.endswith('.sum'):
             # Locate individual file:
-            if path.endswith('.sum'):
-                sf = SumFile(path)
-                self.sumfiles.append(sf)
+            sf = SumFile(path)
+            self.sumfiles.append(sf)
+        else:
+            raise ValueError('expected a directory or a .sum file')
 
     def make_dict_by_rel_path(self):
         result = {}
@@ -426,6 +430,66 @@ class JV(cmdln.Cmdln):
             tr = TextReporter()
             run.summarize(tr)
 
+    def do_test(self, subcmd, opts, *paths):
+        """
+        Run jv's own selftests.
+        """
+        unittest.main(argv=[sys.argv[0], '-v'])
+
+def mock_stdout():
+    return mock.patch('sys.stdout', new=StringIO.StringIO())
+
+class TestTestRun(unittest.TestCase):
+    def test_finding_sum_files_recursively(self):
+        runA = TestRun('control')
+        dict_by_rel_pathA = runA.make_dict_by_rel_path()
+        sumfileA = dict_by_rel_pathA['g++.sum']
+        self.assertEqual(sumfileA.path, 'control/g++.sum')
+
+    def test_individual_sum_file(self):
+        runA = TestRun('control/g++.sum')
+        dict_by_rel_pathA = runA.make_dict_by_rel_path()
+        sumfileA = dict_by_rel_pathA['.']
+        self.assertEqual(sumfileA.path, 'control/g++.sum')
+
+    def test_bogus_path(self):
+        with self.assertRaisesRegexp(ValueError,
+                                     'expected a directory or a .sum file'):
+            runA = TestRun('Makefile')
+
+class TestSumFile(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.sumfile = SumFile('control/g++.sum')
+
+    def test_summarize(self):
+        tr = TextReporter()
+        with mock_stdout() as fake_stdout:
+            self.sumfile.summarize(tr)
+        self.assertEqual(fake_stdout.getvalue(),
+                         'control/g++.sum\n'
+                         '---------------\n'
+                         '\n'
+                         ' FAIL: 8 tests\n'
+                         ' PASS: 118747 tests\n'
+                         ' XFAIL: 434 tests\n'
+                         ' UNSUPPORTED: 4697 tests\n'
+                         '\n')
+
+    def test_get_count_by_outcome(self):
+        self.assertEqual(self.sumfile.get_count_by_outcome('FAIL'), 8)
+        self.assertEqual(self.sumfile.get_count_by_outcome('PASS'), 118747)
+        self.assertEqual(self.sumfile.get_count_by_outcome('XFAIL'), 434)
+        self.assertEqual(self.sumfile.get_count_by_outcome('UNSUPPORTED'), 4697)
+        self.assertEqual(self.sumfile.get_count_by_outcome('UNRESOLVED'), 0)
+
+    def test_one_test(self):
+        TESTNAME \
+            = 'c-c++-common/asan/alloca_big_alignment.c   -O0  execution test'
+
+        self.assertEqual(self.sumfile.testname_to_outcome[TESTNAME], 'PASS')
+        self.assertIn(TESTNAME, self.sumfile.outcome_to_testnames['PASS'])
+        self.assertEqual(self.sumfile.testname_to_lineidx[TESTNAME], 21)
 
 if __name__ == "__main__":
     jv = JV()
