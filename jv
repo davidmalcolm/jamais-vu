@@ -223,6 +223,161 @@ class TextReporter:
             print('%s%s' % (' ' * self.indent, text))
 
 ############################################################################
+# Implementation details of "do_compare"
+############################################################################
+
+class TotalByOutcome(dict):
+    def __init__(self):
+        for outcome in OUTCOMES:
+            self[outcome] = 0
+
+def make_count_text(desc, countA, countB, with_percent=False):
+    if countA == countB:
+        return (' %s: %i'
+                % (desc, countA))
+    else:
+        diff = countB - countA
+        result = (' %s: %i->%i (%s)'
+                  % (desc, countA, countB,
+                     ('+%i' % diff if diff > 0 else '%i' % diff)))
+        if with_percent:
+            percent = countB * 100. / countA
+            result += ' %2.2f%%' % percent
+        return result
+
+class Comparison:
+    def __init__(self, before_path, after_path):
+        self.runA = TestRun(before_path)
+        self.runB = TestRun(after_path)
+
+        self.dict_by_rel_pathA = self.runA.make_dict_by_rel_path()
+        self.dict_by_rel_pathB = self.runB.make_dict_by_rel_path()
+
+        self.relpathsA = set(self.dict_by_rel_pathA.keys())
+        self.relpathsB = set(self.dict_by_rel_pathB.keys())
+
+        self.total_by_outcomeA = TotalByOutcome()
+        self.total_by_outcomeB = TotalByOutcome()
+
+        self.issue_count = 0
+
+    def print_missing_sum_files(self, tr):
+        missing_relpaths = self.relpathsA - self.relpathsB
+        if missing_relpaths:
+            tr.begin_section('sum files that went away: %i'
+                             % len(missing_relpaths))
+            for relpath in sorted(missing_relpaths):
+                sumfileA = self.dict_by_rel_pathA[relpath]
+                sumfileA.summarize(tr)
+                for outcome in OUTCOMES:
+                    self.total_by_outcomeA[outcome] \
+                        += self.sumfileA.get_count_by_outcome(outcome)
+                self.issue_count += 1
+            tr.end_section()
+
+    def print_new_sum_files(self, tr):
+        new_relpaths = self.relpathsB - self.relpathsA
+        if new_relpaths:
+            tr.begin_section('sum files that appeared: %i'
+                             % len(new_relpaths))
+            for relpath in sorted(new_relpaths):
+                sumfileB = self.dict_by_rel_pathB[relpath]
+                sumfileB.summarize(tr)
+                for outcome in OUTCOMES:
+                    self.total_by_outcomeB[outcome] \
+                        += self.sumfileB.get_count_by_outcome(outcome)
+                self.issue_count += 1
+            tr.end_section()
+
+    def compare_sum_files(self, tr):
+        """Compare .sum files for which there are matching peers"""
+        tr.begin_section('Comparing %i common .sum files'
+                         % len(self.relpathsA & self.relpathsB))
+        self.initial_summary(tr)
+        tr.end_section()
+        self.detailed_comparison(tr)
+
+    def initial_summary(self, tr):
+        for relpath in sorted(self.relpathsA & self.relpathsB):
+            sumfileA = self.dict_by_rel_pathA[relpath]
+            sumfileB = self.dict_by_rel_pathB[relpath]
+            outcome_text = make_count_text('total',
+                                           len(sumfileA.testname_to_outcome),
+                                           len(sumfileB.testname_to_outcome))
+            for outcome in OUTCOMES:
+                countA = sumfileA.get_count_by_outcome(outcome)
+                countB = sumfileB.get_count_by_outcome(outcome)
+                if countA or countB:
+                    outcome_text += make_count_text(outcome, countA, countB)
+                self.total_by_outcomeA[outcome] += countA
+                self.total_by_outcomeB[outcome] += countB
+            tr.writeln('%s :%s' % (relpath, outcome_text))
+
+    def detailed_comparison(self, tr):
+        for relpath in sorted(self.relpathsA & self.relpathsB):
+            sumfileA = self.dict_by_rel_pathA[relpath]
+            sumfileB = self.dict_by_rel_pathB[relpath]
+
+            # Compare the individual tests
+            testnamesA = set(sumfileA.testname_to_outcome.keys())
+            testnamesB = set(sumfileB.testname_to_outcome.keys())
+            missing_testnames = testnamesA - testnamesB
+            if missing_testnames:
+                tr.begin_section('Tests that went away in %s: %i'
+                                 % (relpath, len(missing_testnames)))
+                for testname in sorted(missing_testnames):
+                    tr.writeln('%s: %s'
+                               % (sumfileA.testname_to_outcome[testname],
+                                  testname))
+                    self.issue_count += 1
+                tr.end_section()
+
+            new_testnames = testnamesB - testnamesA
+            if new_testnames:
+                tr.begin_section('Tests appeared in %s: %i'
+                                 % (relpath, len(new_testnames)))
+                for testname in sorted(new_testnames):
+                    tr.writeln('%s: %s'
+                               % (sumfileB.testname_to_outcome[testname],
+                                  testname))
+                    self.issue_count += 1
+                tr.end_section()
+
+            # dicts mapping from testname to (before, after) outcome pair
+            changing = {}
+            for testname in sorted(testnamesA & testnamesB):
+                outcomeA = sumfileA.testname_to_outcome[testname]
+                outcomeB = sumfileB.testname_to_outcome[testname]
+                if outcomeA != outcomeB:
+                    changing[testname] = (outcomeA, outcomeB)
+            if changing:
+                tr.begin_section('Tests changing outcome in %s: %i'
+                                 % (relpath, len(changing)))
+                for testname in sorted(changing.keys()):
+                    outcomeA, outcomeB = changing[testname]
+                    tr.writeln('%s -> %s : %s'
+                               % (outcomeA, outcomeB, testname))
+                    self.issue_count += 1
+                tr.end_section()
+
+    def conclusion(self, tr):
+        if self.relpathsA & self.relpathsB and self.issue_count == 0:
+            tr.writeln('No differences found in %i common .sum files'
+                       % len(self.relpathsA & self.relpathsB))
+        else:
+            tr.begin_section('Summary')
+            tr.writeln(make_count_text('# of .sum files',
+                                       len(self.relpathsA),
+                                       len(self.relpathsB)))
+            for outcome in OUTCOMES:
+                countA = self.total_by_outcomeA[outcome]
+                countB = self.total_by_outcomeB[outcome]
+                if countA or countB:
+                    tr.writeln(make_count_text(outcome, countA, countB,
+                                               outcome == 'PASS'))
+            tr.end_section()
+
+############################################################################
 # Command-line interface
 ############################################################################
 
@@ -240,156 +395,16 @@ class JV(cmdln.Cmdln):
         Returns the number of issues found (missing .sum files,
         new failures, etc).
         """
-        runA = TestRun(before_path)
-        runB = TestRun(after_path)
-        dict_by_rel_pathA = runA.make_dict_by_rel_path()
-        dict_by_rel_pathB = runB.make_dict_by_rel_path()
-        #print(dict_by_rel_pathA)
-        #print(dict_by_rel_pathB)
-        relpathsA = set(dict_by_rel_pathA.keys())
-        relpathsB = set(dict_by_rel_pathB.keys())
-
-        #print('relpathsA: %r' % relpathsA)
-        #print('relpathsB: %r' % relpathsB)
-
-        class TotalByOutcome(dict):
-            def __init__(self):
-                for outcome in OUTCOMES:
-                    self[outcome] = 0
-
-        total_by_outcomeA = TotalByOutcome()
-        total_by_outcomeB = TotalByOutcome()
-
-        issue_count = 0
+        c = Comparison(before_path, after_path)
 
         tr = TextReporter()
 
-        missing_relpaths = relpathsA - relpathsB
-        if missing_relpaths:
-            tr.begin_section('sum files that went away: %i'
-                             % len(missing_relpaths))
-            for relpath in sorted(missing_relpaths):
-                sumfileA = dict_by_rel_pathA[relpath]
-                sumfileA.summarize(tr)
-                for outcome in OUTCOMES:
-                    total_by_outcomeA[outcome] \
-                        += sumfileA.get_count_by_outcome(outcome)
-                issue_count += 1
-            tr.end_section()
+        c.print_missing_sum_files(tr)
+        c.print_new_sum_files(tr)
+        c.compare_sum_files(tr)
+        c.conclusion(tr)
 
-        new_relpaths = relpathsB - relpathsA
-        if new_relpaths:
-            tr.begin_section('sum files that appeared: %i'
-                             % len(new_relpaths))
-            for relpath in sorted(new_relpaths):
-                sumfileB = dict_by_rel_pathB[relpath]
-                sumfileB.summarize(tr)
-                for outcome in OUTCOMES:
-                    total_by_outcomeB[outcome] \
-                        += sumfileB.get_count_by_outcome(outcome)
-                issue_count += 1
-            tr.end_section()
-
-        # Compare .sum files for which there are matching peers:
-        tr.begin_section('Comparing %i common .sum files'
-                         % len(relpathsA & relpathsB))
-
-        # Initial summary:
-        for relpath in sorted(relpathsA & relpathsB):
-            sumfileA = dict_by_rel_pathA[relpath]
-            sumfileB = dict_by_rel_pathB[relpath]
-
-            def make_count_text(desc, countA, countB, with_percent=False):
-                if countA == countB:
-                    return (' %s: %i'
-                            % (desc, countA))
-                else:
-                    diff = countB - countA
-                    result = (' %s: %i->%i (%s)'
-                              % (desc, countA, countB,
-                                 ('+%i' % diff if diff > 0 else '%i' % diff)))
-                    if with_percent:
-                        percent = countB * 100. / countA
-                        result += ' %2.2f%%' % percent
-                    return result
-
-            outcome_text = make_count_text('total',
-                                           len(sumfileA.testname_to_outcome),
-                                           len(sumfileB.testname_to_outcome))
-
-            for outcome in OUTCOMES:
-                countA = sumfileA.get_count_by_outcome(outcome)
-                countB = sumfileB.get_count_by_outcome(outcome)
-                if countA or countB:
-                    outcome_text += make_count_text(outcome, countA, countB)
-                total_by_outcomeA[outcome] += countA
-                total_by_outcomeB[outcome] += countB
-            tr.writeln('%s :%s' % (relpath, outcome_text))
-        tr.end_section()
-
-        # Detailed comparison:
-        for relpath in sorted(relpathsA & relpathsB):
-            sumfileA = dict_by_rel_pathA[relpath]
-            sumfileB = dict_by_rel_pathB[relpath]
-
-            # Compare the individual tests
-            testnamesA = set(sumfileA.testname_to_outcome.keys())
-            testnamesB = set(sumfileB.testname_to_outcome.keys())
-            missing_testnames = testnamesA - testnamesB
-            if missing_testnames:
-                tr.begin_section('Tests that went away in %s: %i'
-                                 % (relpath, len(missing_testnames)))
-                for testname in sorted(missing_testnames):
-                    tr.writeln('%s: %s'
-                               % (sumfileA.testname_to_outcome[testname],
-                                  testname))
-                    issue_count += 1
-                tr.end_section()
-
-            new_testnames = testnamesB - testnamesA
-            if new_testnames:
-                tr.begin_section('Tests appeared in %s: %i'
-                                 % (relpath, len(new_testnames)))
-                for testname in sorted(new_testnames):
-                    tr.writeln('%s: %s'
-                               % (sumfileB.testname_to_outcome[testname],
-                                  testname))
-                    issue_count += 1
-                tr.end_section()
-
-            # dicts mapping from testname to (before, after) outcome pair
-            changing = {}
-            for testname in sorted(testnamesA & testnamesB):
-                outcomeA = sumfileA.testname_to_outcome[testname]
-                outcomeB = sumfileB.testname_to_outcome[testname]
-                if outcomeA != outcomeB:
-                    changing[testname] = (outcomeA, outcomeB)
-            if changing:
-                tr.begin_section('Tests changing outcome in %s: %i'
-                                 % (relpath, len(changing)))
-                for testname in sorted(changing.keys()):
-                    outcomeA, outcomeB = changing[testname]
-                    tr.writeln('%s -> %s : %s'
-                               % (outcomeA, outcomeB, testname))
-                    issue_count += 1
-                tr.end_section()
-
-        if relpathsA & relpathsB and issue_count == 0:
-            tr.writeln('No differences found in %i common .sum files'
-                       % len(relpathsA & relpathsB))
-        else:
-            tr.begin_section('Summary')
-            tr.writeln(make_count_text('# of .sum files',
-                                       len(relpathsA), len(relpathsB)))
-            for outcome in OUTCOMES:
-                countA = total_by_outcomeA[outcome]
-                countB = total_by_outcomeB[outcome]
-                if countA or countB:
-                    tr.writeln(make_count_text(outcome, countA, countB,
-                                               outcome == 'PASS'))
-            tr.end_section()
-
-        return issue_count
+        return c.issue_count
 
     def do_dump(self, subcmd, opts, *paths):
         """
@@ -490,6 +505,52 @@ class TestSumFile(unittest.TestCase):
         self.assertEqual(self.sumfile.testname_to_outcome[TESTNAME], 'PASS')
         self.assertIn(TESTNAME, self.sumfile.outcome_to_testnames['PASS'])
         self.assertEqual(self.sumfile.testname_to_lineidx[TESTNAME], 21)
+
+class TestComparison(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.c = Comparison('control', 'experiment')
+
+    def test_print_missing_sum_files(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.print_missing_sum_files(tr)
+        self.assertEqual(fake_stdout.getvalue(), '')
+        # TODO: add a comparison where a .sum file goes away
+
+    def test_print_new_sum_files(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.print_new_sum_files(tr)
+        self.assertEqual(fake_stdout.getvalue(), '')
+        # TODO: add a comparison where a .sum file appears
+
+    def test_compare_sum_files(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.compare_sum_files(tr)
+        self.assertIn(' g++.sum : total: 123886->123896 (+10)'
+                      ' FAIL: 8->11 (+3) PASS: 118747->118757 (+10)'
+                      ' XFAIL: 434 UNSUPPORTED: 4697\n', fake_stdout.getvalue())
+        self.assertIn('Tests that went away in g++.sum: 323\n',
+                      fake_stdout.getvalue())
+        self.assertIn('Tests appeared in g++.sum: 333\n',
+                      fake_stdout.getvalue())
+
+    def test_conclusion(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.conclusion(tr)
+        self.assertMultiLineEqual(fake_stdout.getvalue(),
+                                  'Summary\n'
+                                  '-------\n'
+                                  '\n'
+                                  '  # of .sum files: 1\n'
+                                  '  FAIL: 8->11 (+3)\n'
+                                  '  PASS: 118747->118757 (+10) 100.01%\n'
+                                  '  XFAIL: 434\n'
+                                  '  UNSUPPORTED: 4697\n'
+                                  '\n')
 
 if __name__ == "__main__":
     jv = JV()
