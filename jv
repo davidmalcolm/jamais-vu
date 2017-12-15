@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #   Copyright 2014, 2017 David Malcolm <dmalcolm@redhat.com>
 #   Copyright 2014, 2017 Red Hat, Inc.
 #
@@ -19,11 +19,11 @@
 # Tool for working with DejaGnu output
 
 from collections import namedtuple
+import io
 import mock
 import os
 import re
 import sys
-import StringIO
 import unittest
 
 import cmdln  # in Fedora as "python-cmdln"
@@ -67,12 +67,17 @@ class DejaFile:
         # Mapping from test name to last numeric index
         self.testname_to_last_index = {}
 
+        # Parse the file and build the above dicts:
+        with open(self.path) as f:
+            self.parse_file(f)
+
+    def parse_file(self, f):
         # gcc/testsuite/ada/acats/acats.sum uses a tab rather than a space
         # e.g. 'PASS:\ta22006b\n'
         PATTERN_PAIRS = [(outcome, re.compile('^%s:\s+(\S.*)$' % outcome))
                          for outcome in OUTCOMES]
-        # Parse the file and build the above dicts:
-        for idx, line in enumerate(open(self.path)):
+
+        for idx, line in enumerate(f):
             #print(repr((idx, line)))
             for outcome, PATTERN in PATTERN_PAIRS:
                 m = re.match(PATTERN, line)
@@ -170,7 +175,7 @@ class TestRun:
         self.sumfiles = []
         if os.path.isdir(path):
             # Locate within the directory structure:
-            def visit(arg, dirname, names):
+            for dirname, _, names in os.walk(path):
                 for name in sorted(names):
                     if name.endswith('.sum'):
                         sf = SumFile(os.path.join(dirname, name))
@@ -178,7 +183,6 @@ class TestRun:
                         # print(sf.logfile.testname_to_lineidx)
                         # print(sf.logfile.outcome_to_testnames)
                         self.sumfiles.append(sf)
-            os.path.walk(path, visit, None)
         elif path.endswith('.sum'):
             # Locate individual file:
             sf = SumFile(path)
@@ -470,7 +474,7 @@ class JV(cmdln.Cmdln):
         unittest.main(argv=[sys.argv[0], '-v'])
 
 def mock_stdout():
-    return mock.patch('sys.stdout', new=StringIO.StringIO())
+    return mock.patch('sys.stdout', new=io.StringIO())
 
 class TestTestRun(unittest.TestCase):
     def test_finding_sum_files_recursively(self):
@@ -486,8 +490,8 @@ class TestTestRun(unittest.TestCase):
         self.assertEqual(sumfileA.path, 'control/g++.sum')
 
     def test_bogus_path(self):
-        with self.assertRaisesRegexp(ValueError,
-                                     'expected a directory or a .sum file'):
+        with self.assertRaisesRegex(ValueError,
+                                    'expected a directory or a .sum file'):
             runA = TestRun('Makefile')
 
 class TestSumFile(unittest.TestCase):

@@ -19,6 +19,7 @@ using Python's `cmdln <https://pypi.python.org/pypi/cmdln>`_ package::
       help (?)       give detailed help on a specific sub-command
       summarize      Print a short summary of one or more .sum files or direc...
 
+jv is implemented in Python 3.
 
 Summaries of .sum files
 -----------------------
