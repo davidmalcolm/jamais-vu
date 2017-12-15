@@ -293,7 +293,7 @@ class Comparison:
                 sumfileA.summarize(tr)
                 for outcome in OUTCOMES:
                     self.total_by_outcomeA[outcome] \
-                        += self.sumfileA.get_count_by_outcome(outcome)
+                        += sumfileA.get_count_by_outcome(outcome)
                 self.issue_count += 1
             tr.end_section()
 
@@ -307,7 +307,7 @@ class Comparison:
                 sumfileB.summarize(tr)
                 for outcome in OUTCOMES:
                     self.total_by_outcomeB[outcome] \
-                        += self.sumfileB.get_count_by_outcome(outcome)
+                        += sumfileB.get_count_by_outcome(outcome)
                 self.issue_count += 1
             tr.end_section()
 
@@ -548,14 +548,12 @@ class TestComparison(unittest.TestCase):
             tr = TextReporter()
             self.c.print_missing_sum_files(tr)
         self.assertEqual(fake_stdout.getvalue(), '')
-        # TODO: add a comparison where a .sum file goes away
 
     def test_print_new_sum_files(self):
         with mock_stdout() as fake_stdout:
             tr = TextReporter()
             self.c.print_new_sum_files(tr)
         self.assertEqual(fake_stdout.getvalue(), '')
-        # TODO: add a comparison where a .sum file appears
 
     def test_compare_sum_files(self):
         with mock_stdout() as fake_stdout:
@@ -583,6 +581,203 @@ class TestComparison(unittest.TestCase):
                                   '  XFAIL: 434\n'
                                   '  UNSUPPORTED: 4697\n'
                                   '\n')
+
+class TestComparisonSumFileAppears(unittest.TestCase):
+    """
+    Test what happens when a new .sum file appears (by comparing against
+    an empty directory).
+    """
+    @classmethod
+    def setUpClass(cls):
+        cls.c = Comparison('empty', 'experiment')
+
+    def test_print_missing_sum_files(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.print_missing_sum_files(tr)
+        self.assertEqual(fake_stdout.getvalue(), '')
+
+    def test_print_new_sum_files(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.print_new_sum_files(tr)
+        EXPECTED = (
+            'sum files that appeared: 1\n'
+            '--------------------------\n'
+            '\n'
+            ' experiment/g++.sum\n'
+            ' ------------------\n'
+            '\n'
+            '  FAIL: 11 tests\n'
+            '  PASS: 119879 tests\n'
+            '  XFAIL: 434 tests\n'
+            '  UNSUPPORTED: 4697 tests\n'
+            '\n'
+            '\n')
+        self.assertEqual(fake_stdout.getvalue(), EXPECTED)
+
+    def test_compare_sum_files(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.compare_sum_files(tr)
+        EXPECTED = (
+            'Comparing 0 common .sum files\n'
+            '-----------------------------\n'
+            '\n'
+            '\n')
+        self.assertMultiLineEqual(fake_stdout.getvalue(), EXPECTED)
+
+    def test_conclusion(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.conclusion(tr)
+        EXPECTED = (
+            'Summary\n'
+            '-------\n'
+            '\n'
+            '  # of .sum files: 0->1 (+1)\n'
+            '\n')
+        self.assertMultiLineEqual(fake_stdout.getvalue(), EXPECTED)
+
+class TestComparisonSumFileDisappears(unittest.TestCase):
+    """
+    Test what happens when a .sum file disappears (by comparing against
+    an empty directory).
+    """
+    @classmethod
+    def setUpClass(cls):
+        cls.c = Comparison('experiment', 'empty')
+
+    def test_print_missing_sum_files(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.print_missing_sum_files(tr)
+        EXPECTED = (
+            'sum files that went away: 1\n'
+            '---------------------------\n'
+            '\n'
+            ' experiment/g++.sum\n'
+            ' ------------------\n'
+            '\n'
+            '  FAIL: 11 tests\n'
+            '  PASS: 119879 tests\n'
+            '  XFAIL: 434 tests\n'
+            '  UNSUPPORTED: 4697 tests\n'
+            '\n'
+            '\n')
+        self.assertEqual(fake_stdout.getvalue(), EXPECTED)
+
+    def test_print_new_sum_files(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.print_new_sum_files(tr)
+        self.assertEqual(fake_stdout.getvalue(), '')
+
+    def test_compare_sum_files(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.compare_sum_files(tr)
+        EXPECTED = (
+            'Comparing 0 common .sum files\n'
+            '-----------------------------\n'
+            '\n'
+            '\n')
+        self.assertMultiLineEqual(fake_stdout.getvalue(), EXPECTED)
+
+    def test_conclusion(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.conclusion(tr)
+        EXPECTED = (
+            'Summary\n'
+            '-------\n'
+            '\n'
+            '  # of .sum files: 1->0 (-1)\n'
+            '\n')
+        self.assertMultiLineEqual(fake_stdout.getvalue(), EXPECTED)
+
+class TestSelfComparison(unittest.TestCase):
+    """
+    Test what happens when nothing changes (by comparing a directory
+    against itself).
+    """
+    @classmethod
+    def setUpClass(cls):
+        cls.c = Comparison('experiment', 'experiment')
+
+    def test_print_missing_sum_files(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.print_missing_sum_files(tr)
+        self.assertEqual(fake_stdout.getvalue(), '')
+
+    def test_print_new_sum_files(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.print_new_sum_files(tr)
+        self.assertEqual(fake_stdout.getvalue(), '')
+
+    def test_compare_sum_files(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.compare_sum_files(tr)
+        EXPECTED = (
+            'Comparing 1 common .sum files\n'
+            '-----------------------------\n'
+            '\n'
+            ' g++.sum : total: 125021 FAIL: 11 PASS: 119879 XFAIL: 434 UNSUPPORTED: 4697\n'
+            '\n')
+        self.assertMultiLineEqual(fake_stdout.getvalue(), EXPECTED)
+
+    def test_conclusion(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.conclusion(tr)
+        EXPECTED = 'No differences found in 1 common .sum files\n'
+        self.assertMultiLineEqual(fake_stdout.getvalue(), EXPECTED)
+
+class TestEmptyComparison(unittest.TestCase):
+    """
+    Test what happens when comparing an empty directory against itself.
+    """
+    @classmethod
+    def setUpClass(cls):
+        cls.c = Comparison('empty', 'empty')
+
+    def test_print_missing_sum_files(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.print_missing_sum_files(tr)
+        self.assertEqual(fake_stdout.getvalue(), '')
+
+    def test_print_new_sum_files(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.print_new_sum_files(tr)
+        self.assertEqual(fake_stdout.getvalue(), '')
+
+    def test_compare_sum_files(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.compare_sum_files(tr)
+        EXPECTED = (
+            'Comparing 0 common .sum files\n'
+            '-----------------------------\n'
+            '\n'
+            '\n')
+        self.assertEqual(fake_stdout.getvalue(), EXPECTED)
+
+    def test_conclusion(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.conclusion(tr)
+        EXPECTED = (
+            'Summary\n'
+            '-------\n'
+            '\n'
+            '  # of .sum files: 0\n'
+            '\n')
+        self.assertMultiLineEqual(fake_stdout.getvalue(), EXPECTED)
 
 if __name__ == "__main__":
     jv = JV()
