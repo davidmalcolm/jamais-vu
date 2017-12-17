@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-#   Copyright 2014, 2017 David Malcolm <dmalcolm@redhat.com>
-#   Copyright 2014, 2017 Red Hat, Inc.
+#   Copyright 2014, 2017, 2018 David Malcolm <dmalcolm@redhat.com>
+#   Copyright 2014, 2017, 2018 Red Hat, Inc.
 #
 #   This is free software: you can redistribute it and/or modify it
 #   under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@
 # Tool for working with DejaGnu output
 
 from collections import namedtuple
+import difflib
 import io
 import mock
 import os
@@ -30,6 +31,17 @@ import cmdln  # in Fedora as "python-cmdln"
 
 OUTCOMES='FAIL PASS XFAIL KFAIL XPASS KPASS UNTESTED UNRESOLVED UNSUPPORTED'.split()
 
+def locate_exp_files(source_path):
+    """
+    Locate all .exp files below source_path
+    """
+    result = []
+    for root, dirs, files in os.walk(source_path):
+        for name in files:
+            if name.endswith('.exp'):
+                result.append(os.path.join(root, name))
+    return result
+
 ############################################################################
 # .sum and .log files
 ############################################################################
@@ -40,7 +52,43 @@ class TestId(namedtuple('TestId', ['testname', 'index'])):
       'c-c++-common/pr83059.c  -std=c++11  (test for warnings, line 7)'
     (for which there are several in the test .sum files)
     """
-    pass
+    def get_line_num_info(self):
+        """
+        Get a (filename, details, start_line, end_line) 4-tuple for use
+        when discarding test results that merely changed line.
+
+        Return None if the testname doesn't contain any line numbers.
+
+        For example, given this testname:
+          "g++.dg/diagnostic/param-type-mismatch.C  -std=gnu++11  (test for errors, line 106)"
+        return:
+          ('g++.dg/diagnostic/param-type-mismatch.C',
+           '  -std=gnu++11  (test for errors',
+           106,
+           106)
+        and given this testname:
+          "g++.dg/diagnostic/param-type-mismatch.C  -std=gnu++11  expected multiline pattern lines 108-109 was found: "   return ptr->member_1 \(first, second, third\);.*\n                                             \^\n"
+        return:
+          ('g++.dg/diagnostic/param-type-mismatch.C',
+           '  -std=gnu++11  expected multiline pattern lines    return ptr->member_1 \\(first, second, third\\);.*\\n                                             \\^\\n',
+           108,
+           109)
+        and given this testname w/o any line numbers:
+          'g++.dg/diagnostic/nested-name-1.C  -std=gnu++98 (test for excess errors)'
+        return None
+        """
+        m = re.match('(\S+)(.*\(test for .+), line ([0-9]+)\)', self.testname)
+        if m:
+            filename, details, linenum = m.groups()
+            linenum = int(linenum)
+            return filename, details, linenum, linenum
+        m = re.match('(\S+)(.*expected multiline pattern lines )([0-9]+)-([0-9]+) was found: "(.*)"',
+                     self.testname)
+        if m:
+            #print(m.groups())
+            filename, details_a, linenum_a, linenum_b, details_b = m.groups()
+            return (filename, details_a + details_b,
+                    int(linenum_a), int(linenum_b))
 
 class DejaFile:
     """
@@ -49,6 +97,9 @@ class DejaFile:
     def __init__(self, path):
         self.path = path
         # print('DejaFile(%r)' % self.path)
+
+        # Lazily-populated list of .exp files
+        self.exp_files = None
 
         # Mapping from TestId to outcome:
         # e.g. from the zeroth occurrence of:
@@ -111,6 +162,49 @@ class DejaFile:
     def get_count_by_outcome(self, outcome):
         return len(self.outcome_to_testids[outcome])
 
+    def locate_source_file(self, filename):
+        """
+        Given a filename within a testname
+        (e.g. g++.dg/diagnostic/param-type-mismatch.C'"),
+        attempt to locate the corresponding source file.
+        """
+        # If no source path was provided, we can't locate source files
+        if self.source_path is None:
+            return
+
+        # Look relative to the .exp files found in the source tree
+        if self.exp_files is None:
+            self.exp_files = locate_exp_files(self.source_path)
+            assert self.exp_files is not None
+
+        for exp_file in self.exp_files:
+            exp_dir = os.path.dirname(exp_file)
+            # Look in the parent directory of the directory containing the
+            # .exp file:
+            maybe_src_dir = os.path.dirname(exp_dir)
+            maybe_src_file = os.path.join(maybe_src_dir, filename)
+            if os.path.exists(maybe_src_file):
+                return maybe_src_file
+
+    def get_filename_dict(self, testids):
+        """
+        Given a sequence of TestId instances, generate a dict mapping
+        filenames mentioned in the testids to source file paths.
+        """
+        result = {}
+        for testid in testids:
+            line_num_info = testid.get_line_num_info()
+            if not line_num_info:
+                continue
+            filename, details, linenum_a, linenum_b = line_num_info
+            if filename in result:
+                continue
+            src = self.locate_source_file(filename)
+            if not src:
+                continue
+            result[filename] = src
+        return result
+
 class LogFile(DejaFile):
     """
     A .log file from dejagnu
@@ -125,8 +219,9 @@ class SumFile(DejaFile):
     """
     A .sum file from dejagnu
     """
-    def __init__(self, path, parse_log_file=False):
+    def __init__(self, path, source_path, parse_log_file=False):
         DejaFile.__init__(self, path)
+        self.source_path = source_path
 
         # Locate the .log file that this is a summary of:
         root, ext = os.path.splitext(path)
@@ -170,22 +265,24 @@ class TestRun:
     A collection of .sum files (and their .log files); either
     one or more individual ones, or a directory.
     """
-    def __init__(self, path):
+    def __init__(self, path, source_path):
         self.path = path
+        self.source_path = source_path
         self.sumfiles = []
         if os.path.isdir(path):
             # Locate within the directory structure:
             for dirname, _, names in os.walk(path):
                 for name in sorted(names):
                     if name.endswith('.sum'):
-                        sf = SumFile(os.path.join(dirname, name))
+                        sf = SumFile(os.path.join(dirname, name),
+                                     source_path)
                         # print(sf.logfile.testname_to_outcome)
                         # print(sf.logfile.testname_to_lineidx)
                         # print(sf.logfile.outcome_to_testnames)
                         self.sumfiles.append(sf)
         elif path.endswith('.sum'):
             # Locate individual file:
-            sf = SumFile(path)
+            sf = SumFile(path, source_path)
             self.sumfiles.append(sf)
         else:
             raise ValueError('expected a directory or a .sum file')
@@ -267,10 +364,114 @@ def make_count_text(desc, countA, countB, with_percent=False):
             result += ' %2.2f%%' % percent
         return result
 
+def read_lines(path):
+    with open(path) as f:
+        return f.readlines()
+
+class LineMatcher:
+    """
+    A class for mapping lines in filenameA to those that are unchanged
+    in filenameB, based on difflib.SequenceMatcher.
+    """
+    def __init__(self, filenameA, filenameB):
+        linesA = read_lines(filenameA)
+        linesB = read_lines(filenameB)
+        sm = difflib.SequenceMatcher(None, linesA, linesB)
+        self.matching_blocks = list(sm.get_matching_blocks())
+
+    def get(self, linenumA):
+        """
+        Given a line number in filenameA, attempt to locate the
+        corresponding line number in filename B, or return None.
+        Both line numbers should be 1-based.
+        """
+        zero_based_linenumA = linenumA - 1
+        for m in self.matching_blocks:
+            #print(repr(m))
+            if zero_based_linenumA >= m.a \
+               and zero_based_linenumA < m.a + m.size:
+                offset = zero_based_linenumA - m.a
+                zero_based_linenumB = m.b + offset
+                linenumB = zero_based_linenumB + 1
+                return linenumB
+
+def remap_for_changing_line_numbers(sumfileA, testidsA,
+                                    sumfileB, testidsB):
+    """
+    Given a pair of SumFiles and a pair of sets of TestIds,
+    return the pair of sets of TestIds, but with some TestIds
+    removed, corresponding to unrelated line number changes.
+
+    Specifically, any TestIds that are identical with a peer TestId
+    in the other set, *apart* from line number can be removed,
+    provided that the line number difference corresponds to a
+    renumbering due to the changes in the pertinent source file.
+    """
+    # Look at "missing" test ids; did they really just change line number?
+    missing = testidsA - testidsB
+    new = testidsB - testidsA
+
+    missing_files = sumfileA.get_filename_dict(missing)
+    new_files = sumfileB.get_filename_dict(new)
+
+    line_matchers_by_filename = {}
+
+    for testidA in sorted(missing):
+        line_num_infoA = testidA.get_line_num_info()
+        if not line_num_infoA:
+            continue
+        filenameA, detailsA, startlineA, endlineA = line_num_infoA
+        if filenameA not in missing_files:
+            continue
+        if filenameA not in new_files:
+            continue
+        if not filenameA in line_matchers_by_filename:
+            line_matchers_by_filename[filenameA] \
+                = LineMatcher(missing_files[filenameA],
+                              new_files[filenameA])
+        lm = line_matchers_by_filename[filenameA]
+        expected_startlineB = lm.get(startlineA)
+        if expected_startlineB is None:
+            continue
+        expected_endlineB = lm.get(endlineA)
+        if expected_endlineB is None:
+            continue
+        #print('got here: %r %r' % (testidA, expected_linenumB))
+        # TODO: avoid O(N^2) here?
+        for testidB in new:
+            line_num_infoB = testidB.get_line_num_info()
+            if not line_num_infoB:
+                continue
+            filenameB, detailsB, startlineB, endlineB = line_num_infoB
+            if (filenameA, detailsA, expected_startlineB, expected_endlineB) \
+               != (filenameB, detailsB, startlineB, endlineB):
+                continue
+
+            assert testidA in sumfileA.testid_to_outcome
+            assert testidB in sumfileB.testid_to_outcome
+            if sumfileA.testid_to_outcome[testidA] \
+               != sumfileB.testid_to_outcome[testidB]:
+                # The outcome changed; don't remove it, as we want to
+                # report PASS -> FAIL changes etc
+                continue
+
+            # This test changed line, but the outcome is unchanged;
+            # drop it from the set of changes.
+            if 0:
+                print('test changed line: A: %r B: %r'
+                      % (line_num_infoA, line_num_infoB))
+            testidsA.remove(testidA)
+            testidsB.remove(testidB)
+            break
+
+    return testidsA, testidsB
+
 class Comparison:
-    def __init__(self, before_path, after_path):
-        self.runA = TestRun(before_path)
-        self.runB = TestRun(after_path)
+    def __init__(self,
+                 before_path, old_source_path,
+                 after_path, new_source_path):
+        self.runA = TestRun(before_path, old_source_path)
+        self.runB = TestRun(after_path, new_source_path)
 
         self.dict_by_rel_pathA = self.runA.make_dict_by_rel_path()
         self.dict_by_rel_pathB = self.runB.make_dict_by_rel_path()
@@ -343,6 +544,9 @@ class Comparison:
             # Compare the individual tests
             testidsA = set(sumfileA.testid_to_outcome.keys())
             testidsB = set(sumfileB.testid_to_outcome.keys())
+            testidsA, testidsB \
+                = remap_for_changing_line_numbers(sumfileA, testidsA,
+                                                  sumfileB, testidsB)
             missing_testids = testidsA - testidsB
             if missing_testids:
                 tr.begin_section('Tests that went away in %s: %i'
@@ -399,6 +603,10 @@ class Comparison:
                                                outcome == 'PASS'))
             tr.end_section()
 
+class SourcelessComparison(Comparison):
+    def __init__(self, before_path, after_path):
+        Comparison.__init__(self, before_path, None, after_path, None)
+
 ############################################################################
 # Command-line interface
 ############################################################################
@@ -406,18 +614,27 @@ class Comparison:
 class JV(cmdln.Cmdln):
     name = 'jv'
 
+    @cmdln.option("--new-source-path", metavar='DIR',
+                  help='path to source files for "after" run')
+    @cmdln.option("--old-source-path", metavar='DIR',
+                  help='path to source files for "before" run')
     def do_compare(self, subcmd, opts, before_path, after_path):
         """
         Compare a "before" run to an "after" run.
         Accepts a pair of directories, or a pair of .sum files.
 
         If a pair of directories, assume that they have the same
-        underlying structure when peer-matching.
+        underlying structure when peer-matching (all descendent
+        .sum files will be scanned).
 
         Returns the number of issues found (missing .sum files,
         new failures, etc).
+
+        ${cmd_usage}
+        ${cmd_option_list}
         """
-        c = Comparison(before_path, after_path)
+        c = Comparison(before_path, opts.old_source_path,
+                       after_path, opts.new_source_path)
 
         tr = TextReporter()
 
@@ -476,15 +693,22 @@ class JV(cmdln.Cmdln):
 def mock_stdout():
     return mock.patch('sys.stdout', new=io.StringIO())
 
+class TestSupportFunctions(unittest.TestCase):
+    def test_locate_exp_files(self):
+        self.assertEqual(locate_exp_files('test-changing-linenums/old/src'),
+                         ['test-changing-linenums/old/src/gcc/testsuite/g++.dg/dg.exp'])
+        self.assertEqual(locate_exp_files('test-changing-linenums/new/src'),
+                         ['test-changing-linenums/new/src/gcc/testsuite/g++.dg/dg.exp'])
+
 class TestTestRun(unittest.TestCase):
     def test_finding_sum_files_recursively(self):
-        runA = TestRun('control')
+        runA = TestRun('control', None)
         dict_by_rel_pathA = runA.make_dict_by_rel_path()
         sumfileA = dict_by_rel_pathA['g++.sum']
         self.assertEqual(sumfileA.path, 'control/g++.sum')
 
     def test_individual_sum_file(self):
-        runA = TestRun('control/g++.sum')
+        runA = TestRun('control/g++.sum', None)
         dict_by_rel_pathA = runA.make_dict_by_rel_path()
         sumfileA = dict_by_rel_pathA['.']
         self.assertEqual(sumfileA.path, 'control/g++.sum')
@@ -492,12 +716,12 @@ class TestTestRun(unittest.TestCase):
     def test_bogus_path(self):
         with self.assertRaisesRegex(ValueError,
                                     'expected a directory or a .sum file'):
-            runA = TestRun('Makefile')
+            runA = TestRun('Makefile', None)
 
 class TestSumFile(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.sumfile = SumFile('control/g++.sum')
+        cls.sumfile = SumFile('control/g++.sum', None)
 
     def test_summarize(self):
         tr = TextReporter()
@@ -541,7 +765,7 @@ class TestSumFile(unittest.TestCase):
 class TestComparison(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.c = Comparison('control', 'experiment')
+        cls.c = SourcelessComparison('control', 'experiment')
 
     def test_print_missing_sum_files(self):
         with mock_stdout() as fake_stdout:
@@ -589,7 +813,7 @@ class TestComparisonSumFileAppears(unittest.TestCase):
     """
     @classmethod
     def setUpClass(cls):
-        cls.c = Comparison('empty', 'experiment')
+        cls.c = SourcelessComparison('empty', 'experiment')
 
     def test_print_missing_sum_files(self):
         with mock_stdout() as fake_stdout:
@@ -646,7 +870,7 @@ class TestComparisonSumFileDisappears(unittest.TestCase):
     """
     @classmethod
     def setUpClass(cls):
-        cls.c = Comparison('experiment', 'empty')
+        cls.c = SourcelessComparison('experiment', 'empty')
 
     def test_print_missing_sum_files(self):
         with mock_stdout() as fake_stdout:
@@ -703,7 +927,7 @@ class TestSelfComparison(unittest.TestCase):
     """
     @classmethod
     def setUpClass(cls):
-        cls.c = Comparison('experiment', 'experiment')
+        cls.c = SourcelessComparison('experiment', 'experiment')
 
     def test_print_missing_sum_files(self):
         with mock_stdout() as fake_stdout:
@@ -742,7 +966,7 @@ class TestEmptyComparison(unittest.TestCase):
     """
     @classmethod
     def setUpClass(cls):
-        cls.c = Comparison('empty', 'empty')
+        cls.c = SourcelessComparison('empty', 'empty')
 
     def test_print_missing_sum_files(self):
         with mock_stdout() as fake_stdout:
@@ -778,6 +1002,161 @@ class TestEmptyComparison(unittest.TestCase):
             '  # of .sum files: 0\n'
             '\n')
         self.assertMultiLineEqual(fake_stdout.getvalue(), EXPECTED)
+
+class TestRemappingLineNumbers(unittest.TestCase):
+    """
+    Verify the machinery for suppressing testcases that purely change
+    their line number.
+    """
+    def test_locate_source_file(self):
+        sumfileA = SumFile('test-changing-linenums/old/build/gcc/testsuite/g++/g++.sum',
+                           source_path='test-changing-linenums/old/src')
+        self.assertEqual(sumfileA.locate_source_file('does not exist'), None)
+        self.assertEqual(sumfileA.locate_source_file('g++.dg/diagnostic/param-type-mismatch.C'),
+                         'test-changing-linenums/old/src/gcc/testsuite/g++.dg/diagnostic/param-type-mismatch.C')
+        self.assertEqual(sumfileA.locate_source_file('g++.dg/plugin/diagnostic-test-expressions-1.C'),
+                         'test-changing-linenums/old/src/gcc/testsuite/g++.dg/plugin/diagnostic-test-expressions-1.C')
+
+        sumfileB = SumFile('test-changing-linenums/new/build/gcc/testsuite/g++/g++.sum',
+                           source_path='test-changing-linenums/new/src')
+        self.assertEqual(sumfileB.locate_source_file('does not exist'), None)
+        self.assertEqual(sumfileB.locate_source_file('g++.dg/diagnostic/param-type-mismatch.C'),
+                         'test-changing-linenums/new/src/gcc/testsuite/g++.dg/diagnostic/param-type-mismatch.C')
+        self.assertEqual(sumfileB.locate_source_file('g++.dg/plugin/diagnostic-test-expressions-1.C'),
+                         'test-changing-linenums/new/src/gcc/testsuite/g++.dg/plugin/diagnostic-test-expressions-1.C')
+
+
+    def get_test_testid(self):
+        TESTNAME = 'g++.dg/diagnostic/param-type-mismatch.C  -std=gnu++11  (test for errors, line 106)'
+        return TestId(TESTNAME, 0)
+
+    def test_get_line_num_info(self):
+        testid = self.get_test_testid()
+        self.assertEqual(testid.get_line_num_info(),
+                         ('g++.dg/diagnostic/param-type-mismatch.C',
+                          '  -std=gnu++11  (test for errors',
+                          106, 106))
+
+        TESTNAME_2 = r'g++.dg/diagnostic/param-type-mismatch.C  -std=gnu++11  expected multiline pattern lines 108-109 was found: "   return ptr->member_1 \(first, second, third\);.*\n                                             \^\n"'
+        testid_2 = TestId(TESTNAME_2, 0)
+        self.assertEqual(testid_2.get_line_num_info(),
+                         ('g++.dg/diagnostic/param-type-mismatch.C',
+                          '  -std=gnu++11  expected multiline pattern lines    return ptr->member_1 \\(first, second, third\\);.*\\n                                             \\^\\n',
+                          108, 109))
+
+        TESTNAME_3 = 'g++.dg/diagnostic/nested-name-1.C  -std=gnu++98 (test for excess errors)'
+        testid_3 = TestId(TESTNAME_3, 0)
+        self.assertEqual(testid_3.get_line_num_info(), None)
+
+    def test_get_filename_dict(self):
+        sumfile = SumFile('test-changing-linenums/old/build/gcc/testsuite/g++/g++.sum',
+                          source_path='test-changing-linenums/old/src')
+        testid = self.get_test_testid()
+        d = sumfile.get_filename_dict(set([testid]))
+        self.assertIn('g++.dg/diagnostic/param-type-mismatch.C', d)
+        self.assertEqual(d['g++.dg/diagnostic/param-type-mismatch.C'],
+                         'test-changing-linenums/old/src/gcc/testsuite/g++.dg/diagnostic/param-type-mismatch.C')
+
+    def test_line_matcher(self):
+        old = 'test-changing-linenums/old/src/gcc/testsuite/g++.dg/diagnostic/param-type-mismatch.C'
+        new = old.replace('old', 'new')
+        lm = LineMatcher(old, new)
+
+        self.assertEqual(lm.get(106), 103)
+        self.assertEqual(lm.get(124), 121)
+        self.assertEqual(lm.get(14), 11)
+        self.assertEqual(lm.get(1), 1)
+
+    def test_remap_for_changing_line_numbers(self):
+        """
+        Verify that test thats merely change line number are eliminated by
+        remap_for_changing_line_numbers.
+        """
+
+        # First for a single line number, moving from line 106 in old
+        # source tree to line 103 in new source tree.
+
+        sumfileA = SumFile('test-changing-linenums/old/build/gcc/testsuite/g++/g++.sum',
+                           source_path='test-changing-linenums/old/src')
+        sumfileB = SumFile('test-changing-linenums/new/build/gcc/testsuite/g++/g++.sum',
+                           source_path='test-changing-linenums/new/src')
+
+        TESTNAME_A = 'g++.dg/diagnostic/param-type-mismatch.C  -std=gnu++11  (test for errors, line 106)'
+        TESTNAME_B = TESTNAME_A.replace('106', '103')
+
+        testidsA = set([TestId(TESTNAME_A, 0)])
+        testidsB = set([TestId(TESTNAME_B, 0)])
+
+        testidsA, testidsB \
+            = remap_for_changing_line_numbers(sumfileA, testidsA,
+                                              sumfileB, testidsB)
+        self.assertEqual(testidsA, set())
+        self.assertEqual(testidsB, set())
+
+        # Again, but for a multiline test, moving from lines 260-261 in
+        # old source tree to lines 345-346.
+
+        TESTNAME_A = r'g++.dg/plugin/diagnostic-test-expressions-1.C -fplugin=./diagnostic_plugin_test_tree_expression_range.so  expected multiline pattern lines 260-261 was found: "   __emit_expression_range \(0, lhs / rhs \);.*\n                               ~~~~\^~~~~\n"'
+        TESTNAME_B = TESTNAME_A.replace('260', '345')
+        TESTNAME_B = TESTNAME_B.replace('261', '346')
+        self.assertIn('345-346', TESTNAME_B)
+        testidA = TestId(TESTNAME_A, 0)
+        testidsA = set([testidA])
+        testidB = TestId(TESTNAME_B, 0)
+        testidsB = set([testidB])
+
+        self.assertEqual(sumfileA.testid_to_outcome[testidA], 'PASS')
+        self.assertEqual(sumfileB.testid_to_outcome[testidB], 'PASS')
+
+        testidsA, testidsB \
+            = remap_for_changing_line_numbers(sumfileA, testidsA,
+                                              sumfileB, testidsB)
+        self.assertEqual(testidsA, set())
+        self.assertEqual(testidsB, set())
+
+        # Verify that if the outcome changed, then the remapping
+        # shouldn't occur:
+        sumfileB.testid_to_outcome[testidB] = 'FAIL'
+        testidsA = set([testidA])
+        testidsB = set([testidB])
+        testidsA, testidsB \
+            = remap_for_changing_line_numbers(sumfileA, testidsA,
+                                              sumfileB, testidsB)
+        self.assertEqual(testidsA, set([testidA]))
+        self.assertEqual(testidsB, set([testidB]))
+
+class TestComparisonWithSource(unittest.TestCase):
+    """
+    Verify that the presence of source files allows us to suppress tests
+    that merely changed line number (due to unrelated edits).
+    """
+    @classmethod
+    def setUpClass(cls):
+        cls.c = Comparison('test-changing-linenums/old/build', 'test-changing-linenums/old/src',
+                           'test-changing-linenums/new/build', 'test-changing-linenums/new/src')
+
+    def test_compare_sum_files(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.compare_sum_files(tr)
+        self.assertIn('g++.sum : total: 369->379 (+10) PASS: 369->379 (+10)\n',
+                      fake_stdout.getvalue())
+        self.assertIn('Tests that went away in gcc/testsuite/g++/g++.sum: 89',
+                      fake_stdout.getvalue()) # would be 323 without suppression
+        self.assertIn('Tests appeared in gcc/testsuite/g++/g++.sum: 99',
+                      fake_stdout.getvalue()) # would be 333 without suppression
+
+    def test_conclusion(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.conclusion(tr)
+        self.assertMultiLineEqual(fake_stdout.getvalue(),
+                                  'Summary\n'
+                                  '-------\n'
+                                  '\n'
+                                  '  # of .sum files: 1\n'
+                                  '  PASS: 369->379 (+10) 102.71%\n'
+                                  '\n')
 
 if __name__ == "__main__":
     jv = JV()
