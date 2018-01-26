@@ -651,7 +651,7 @@ class JV(cmdln.Cmdln):
         by outcome.
         """
         for path in paths:
-            run = TestRun(path)
+            run = TestRun(path, None)
             tr = TextReporter()
             run.dump(tr)
 
@@ -671,7 +671,7 @@ class JV(cmdln.Cmdln):
         """
         count = 0
         for path in paths:
-            run = TestRun(path)
+            run = TestRun(path, None)
             count += run.find(testname)
         return count
 
@@ -680,7 +680,7 @@ class JV(cmdln.Cmdln):
         Print a short summary of one or more .sum files or directories.
         """
         for path in paths:
-            run = TestRun(path)
+            run = TestRun(path, None)
             tr = TextReporter()
             run.summarize(tr)
 
