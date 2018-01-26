@@ -232,7 +232,10 @@ class SumFile(DejaFile):
 
     def load_log_file(self):
         if not self.logfile:
-            self.logfile = LogFile(self.logpath)
+            try:
+                self.logfile = LogFile(self.logpath)
+            except FileNotFoundError:
+                pass
 
     def __repr__(self):
         return 'SumFile(%r)' % self.path
@@ -248,7 +251,8 @@ class SumFile(DejaFile):
         if count:
             # Also find within .log file:
             self.load_log_file()
-            count += self.logfile.find(testname)
+            if self.logfile:
+                count += self.logfile.find(testname)
 
         return count
 
@@ -1261,6 +1265,18 @@ class TestFind(unittest.TestCase):
                                   'test-with-log-files/new/boehm-gc.log:44: PASS: boehm-gc.c/leak_test.c -O2 execution test\n'
                                   'test-with-log-files/old/boehm-gc.sum:14: PASS: boehm-gc.c/leak_test.c -O2 execution test\n'
                                   'test-with-log-files/old/boehm-gc.log:44: PASS: boehm-gc.c/leak_test.c -O2 execution test\n')
+
+    def test_without_log_file(self):
+        '''
+        Verify 'find' on a .sum file that's missing its .log file.
+        '''
+        jv = JV()
+        with mock_stdout() as fake_stdout:
+            jv.main(['jv', 'find',
+                     'g++.old-deja/g++.warn/cast-align1.C  -std=gnu++11',
+                     'control'])
+        self.assertMultiLineEqual(fake_stdout.getvalue(),
+                                  'control/g++.sum:124888: UNSUPPORTED: g++.old-deja/g++.warn/cast-align1.C  -std=gnu++11\n')
 
 class TestSummarize(unittest.TestCase):
     """
