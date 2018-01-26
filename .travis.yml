@@ -1,0 +1,11 @@
+language: python
+  - "3.3"
+  - "3.4"
+  - "3.5"
+  - "3.6"
+  - "pypy3"
+
+script: make test
+
+install:
+  - pip install cmdln
