@@ -302,7 +302,7 @@ class TestRun:
             for outcome in OUTCOMES:
                 tr.begin_section('%s: %i tests'
                                  % (outcome, sumfile.get_count_by_outcome (outcome)))
-                for testname in sorted(sumfile.outcome_to_testnames[outcome]):
+                for testname in sorted(sumfile.outcome_to_testids[outcome]):
                     tr.writeln(testname)
                 tr.end_section()
             tr.end_section()
