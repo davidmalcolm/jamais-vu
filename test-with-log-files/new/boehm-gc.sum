@@ -1,0 +1,29 @@
+Test Run By root on Sat Nov 23 22:57:01 2013
+Native configuration is x86_64-unknown-linux-gnu
+
+		=== boehm-gc tests ===
+
+Schedule of variations:
+    unix
+
+Running target unix
+Running /root/gcc-build/test/experiment/src/boehm-gc/testsuite/boehm-gc.c/c.exp ...
+PASS: boehm-gc.c/gctest.c -O2 (test for excess errors)
+PASS: boehm-gc.c/gctest.c -O2 execution test
+PASS: boehm-gc.c/leak_test.c -O2 (test for excess errors)
+PASS: boehm-gc.c/leak_test.c -O2 execution test
+PASS: boehm-gc.c/middle.c -O2 (test for excess errors)
+PASS: boehm-gc.c/middle.c -O2 execution test
+PASS: boehm-gc.c/thread_leak_test.c -O2 (test for excess errors)
+PASS: boehm-gc.c/thread_leak_test.c -O2 execution test
+UNSUPPORTED: boehm-gc.c/trace_test.c -O2
+Running /root/gcc-build/test/experiment/src/boehm-gc/testsuite/boehm-gc.lib/lib.exp ...
+PASS: boehm-gc.lib/staticrootslib.c -O2 (test for excess errors)
+PASS: staticrootslib.lo -O2 (test for excess errors)
+PASS: boehm-gc.lib/staticrootstest.c -O2 (test for excess errors)
+PASS: boehm-gc.lib/staticrootstest.c -O2 execution test
+
+		=== boehm-gc Summary ===
+
+# of expected passes		12
+# of unsupported tests		1

@@ -148,14 +148,14 @@ class DejaFile:
 
     def find(self, search_testname):
         result = 0
-        for cand_testname in sorted(self.testname_to_outcome):
+        for cand_testid in sorted(self.testid_to_outcome):
             # substring matches
-            if search_testname in cand_testname:
+            if search_testname in cand_testid.testname:
                 print('%s:%i: %s: %s'
                       % (self.path,
-                         self.testname_to_lineidx[cand_testname] + 1,
-                         self.testname_to_outcome[cand_testname],
-                         cand_testname))
+                         self.testid_to_lineidx[cand_testid] + 1,
+                         self.testid_to_outcome[cand_testid],
+                         cand_testid.testname))
                 result += 1
         return result
 
@@ -237,8 +237,8 @@ class SumFile(DejaFile):
     def __repr__(self):
         return 'SumFile(%r)' % self.path
 
-    def __cmp__(self, other):
-        return cmp(self.path, other.path)
+    def __lt__(self, other):
+        return self.path < other.path
 
     def relative_path(self, basedir):
         return os.path.relpath(self.path, basedir)
@@ -302,8 +302,8 @@ class TestRun:
             for outcome in OUTCOMES:
                 tr.begin_section('%s: %i tests'
                                  % (outcome, sumfile.get_count_by_outcome (outcome)))
-                for testname in sorted(sumfile.outcome_to_testnames[outcome]):
-                    tr.writeln(testname)
+                for testid in sorted(sumfile.outcome_to_testids[outcome]):
+                    tr.writeln(testid.testname)
                 tr.end_section()
             tr.end_section()
 
@@ -693,12 +693,30 @@ class JV(cmdln.Cmdln):
 def mock_stdout():
     return mock.patch('sys.stdout', new=io.StringIO())
 
+def get_first_lines(data, count):
+    lines = data.splitlines()
+    lines = lines[:count]
+    return ''.join(line + '\n' for line in lines)
+
 class TestSupportFunctions(unittest.TestCase):
     def test_locate_exp_files(self):
         self.assertEqual(locate_exp_files('test-changing-linenums/old/src'),
                          ['test-changing-linenums/old/src/gcc/testsuite/g++.dg/dg.exp'])
         self.assertEqual(locate_exp_files('test-changing-linenums/new/src'),
                          ['test-changing-linenums/new/src/gcc/testsuite/g++.dg/dg.exp'])
+
+    def test_get_first_lines(self):
+        self.assertMultiLineEqual(get_first_lines('', 0), '')
+        self.assertMultiLineEqual(get_first_lines('', 5), '')
+        THREE_LINES = ('foo\n'
+                       'bar\n'
+                       'baz\n')
+        self.assertMultiLineEqual(get_first_lines(THREE_LINES, 0), '')
+        self.assertMultiLineEqual(get_first_lines(THREE_LINES, 2),
+                                  'foo\n'
+                                  'bar\n')
+        self.assertMultiLineEqual(get_first_lines(THREE_LINES, 4),
+                                  THREE_LINES)
 
 class TestTestRun(unittest.TestCase):
     def test_finding_sum_files_recursively(self):
@@ -1156,6 +1174,124 @@ class TestComparisonWithSource(unittest.TestCase):
                                   '\n'
                                   '  # of .sum files: 1\n'
                                   '  PASS: 369->379 (+10) 102.71%\n'
+                                  '\n')
+
+class TestComparisonCommand(unittest.TestCase):
+    """
+    Integration testing for the "compare" command
+    """
+    def test_compare_files(self):
+        jv = JV()
+        with mock_stdout() as fake_stdout:
+            jv.main(['jv', 'compare',
+                     'test-with-log-files/old/boehm-gc.sum',
+                     'test-with-log-files/new/boehm-gc.sum'])
+        # TODO: the "." in this output could be improved
+        self.assertMultiLineEqual(fake_stdout.getvalue(),
+                                  'Comparing 1 common .sum files\n'
+                                  '-----------------------------\n'
+                                  '\n'
+                                  ' . : total: 13 PASS: 12 UNSUPPORTED: 1\n'
+                                  '\n'
+                                  'No differences found in 1 common .sum files\n')
+
+    def test_compare_directory(self):
+        jv = JV()
+        with mock_stdout() as fake_stdout:
+            jv.main(['jv', 'compare',
+                     'test-with-log-files/old',
+                     'test-with-log-files/new'])
+        self.assertMultiLineEqual(fake_stdout.getvalue(),
+                                  'Comparing 1 common .sum files\n'
+                                  '-----------------------------\n'
+                                  '\n'
+                                  ' boehm-gc.sum : total: 13 PASS: 12 UNSUPPORTED: 1\n'
+                                  '\n'
+                                  'No differences found in 1 common .sum files\n')
+
+class TestDump(unittest.TestCase):
+    """
+    Integration testing for the "dump" command
+    """
+    def verify_output(self, out):
+        start = get_first_lines(out, 7)
+        self.assertMultiLineEqual(start,
+                                  'control/g++.sum\n'
+                                  '---------------\n'
+                                  '\n'
+                                  ' FAIL: 8 tests\n'
+                                  ' -------------\n'
+                                  '\n'
+                                  '  g++.dg/ipa/devirt-22.C  -std=gnu++11  scan-ipa-dump-times cp "Discovered a virtual call to a known target" 1 (found 2 times)\n')
+        self.assertIn('PASS: 119872 tests', out)
+
+    def test_dumping_one_file(self):
+        jv = JV()
+        with mock_stdout() as fake_stdout:
+            jv.main(['jv', 'dump', 'control/g++.sum'])
+        self.verify_output(fake_stdout.getvalue())
+
+    def test_dumping_directory(self):
+        jv = JV()
+        with mock_stdout() as fake_stdout:
+            jv.main(['jv', 'dump', 'control'])
+        self.verify_output(fake_stdout.getvalue())
+
+class TestFind(unittest.TestCase):
+    """
+    Integration testing for the "find" command
+    """
+    TESTNAME = 'boehm-gc.c/leak_test.c -O2 execution test'
+
+    def test_find_within_one_file(self):
+        jv = JV()
+        with mock_stdout() as fake_stdout:
+            jv.main(['jv', 'find', self.TESTNAME,
+                     'test-with-log-files/old/boehm-gc.sum'])
+        self.assertMultiLineEqual(fake_stdout.getvalue(),
+                                  'test-with-log-files/old/boehm-gc.sum:14: PASS: boehm-gc.c/leak_test.c -O2 execution test\n'
+                                  'test-with-log-files/old/boehm-gc.log:44: PASS: boehm-gc.c/leak_test.c -O2 execution test\n')
+
+    def test_find_below_directory(self):
+        jv = JV()
+        with mock_stdout() as fake_stdout:
+            jv.main(['jv', 'find', self.TESTNAME, 'test-with-log-files'])
+        self.assertMultiLineEqual(fake_stdout.getvalue(),
+                                  'test-with-log-files/new/boehm-gc.sum:14: PASS: boehm-gc.c/leak_test.c -O2 execution test\n'
+                                  'test-with-log-files/new/boehm-gc.log:44: PASS: boehm-gc.c/leak_test.c -O2 execution test\n'
+                                  'test-with-log-files/old/boehm-gc.sum:14: PASS: boehm-gc.c/leak_test.c -O2 execution test\n'
+                                  'test-with-log-files/old/boehm-gc.log:44: PASS: boehm-gc.c/leak_test.c -O2 execution test\n')
+
+class TestSummarize(unittest.TestCase):
+    """
+    Integration testing for the "summarize" command
+    """
+    def test_summarize_one_file(self):
+        jv = JV()
+        with mock_stdout() as fake_stdout:
+            jv.main(['jv', 'summarize', 'test-with-log-files/old/boehm-gc.sum'])
+        self.assertMultiLineEqual(fake_stdout.getvalue(),
+                                  'test-with-log-files/old/boehm-gc.sum\n'
+                                  '------------------------------------\n'
+                                  '\n'
+                                  ' PASS: 12 tests\n'
+                                  ' UNSUPPORTED: 1 tests\n'
+                                  '\n')
+
+    def test_summarize_directory(self):
+        jv = JV()
+        with mock_stdout() as fake_stdout:
+            jv.main(['jv', 'summarize', 'test-changing-linenums'])
+        self.assertMultiLineEqual(fake_stdout.getvalue(),
+                                  'test-changing-linenums/new/build/gcc/testsuite/g++/g++.sum\n'
+                                  '----------------------------------------------------------\n'
+                                  '\n'
+                                  ' PASS: 379 tests\n'
+                                  '\n'
+                                  'test-changing-linenums/old/build/gcc/testsuite/g++/g++.sum\n'
+                                  '----------------------------------------------------------\n'
+                                  '\n'
+                                  ' PASS: 369 tests\n'
                                   '\n')
 
 if __name__ == "__main__":

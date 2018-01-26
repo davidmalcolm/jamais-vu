@@ -1,0 +1,119 @@
+Test Run By root on Fri Nov 22 22:07:56 2013
+Native configuration is x86_64-unknown-linux-gnu
+
+		=== boehm-gc tests ===
+
+Schedule of variations:
+    unix
+
+Running target unix
+Using /usr/share/dejagnu/baseboards/unix.exp as board description file for target.
+Using /usr/share/dejagnu/config/unix.exp as generic interface file for target.
+Using /root/gcc-build/test/control/src/boehm-gc/testsuite/config/default.exp as tool-and-target-specific interface file.
+Running /root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.c/c.exp ...
+set_ld_library_path_env_vars: ld_library_path=.:/root/gcc-build/test/control/build/gcc:/root/gcc-build/test/control/build/gcc/32:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/.libs:.libs
+Executing on host: ../libtool --silent --tag=CC --mode=link  /root/gcc-build/test/control/build/gcc/xgcc -B/root/gcc-build/test/control/build/gcc/ /root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.c/gctest.c /root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/libgcjgc.la  -O2  -I/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/include -I/root/gcc-build/test/control/src/boehm-gc/testsuite/../include   -Wc,-shared-libgcc -lpthread -ldl -lm   -o ./gctest    (timeout = 300)
+spawn -ignore SIGHUP ../libtool --silent --tag=CC --mode=link /root/gcc-build/test/control/build/gcc/xgcc -B/root/gcc-build/test/control/build/gcc/ /root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.c/gctest.c /root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/libgcjgc.la -O2 -I/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/include -I/root/gcc-build/test/control/src/boehm-gc/testsuite/../include -Wc,-shared-libgcc -lpthread -ldl -lm -o ./gctest
+PASS: boehm-gc.c/gctest.c -O2 (test for excess errors)
+Setting LD_LIBRARY_PATH to .:/root/gcc-build/test/control/build/gcc:/root/gcc-build/test/control/build/gcc/32:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/.libs:.libs:.:/root/gcc-build/test/control/build/gcc:/root/gcc-build/test/control/build/gcc/32:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/.libs:.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libstdc++-v3/src/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libsanitizer/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libvtv/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libcilkrts/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libssp/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libgomp/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libitm/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libatomic/.libs:/root/gcc-build/test/control/build/./gcc:/root/gcc-build/test/control/build/./prev-gcc:/root/gcc-build/dep-prefix/lib:/root/gcc-build/dep-prefix/lib
+spawn [open ...]
+Switched to incremental mode
+Emulating dirty bits with mprotect/signals
+Completed 3 tests
+Allocated 5714089 collectable objects
+Allocated 306 uncollectable objects
+Allocated 3750000 atomic objects
+Allocated 34439 stubborn objects
+Finalized 6607/6607 objects - finalization is probably ok
+Total number of bytes allocated is 328530712
+Final heap size is 17149952 bytes
+Collector appears to work
+Completed 430 collections
+PASS: boehm-gc.c/gctest.c -O2 execution test
+Executing on host: ../libtool --mode=clean rm -f  gctest    (timeout = 300)
+spawn -ignore SIGHUP ../libtool --mode=clean rm -f gctest
+libtool: clean: rm -f gctest .libs/gctest .libs/gctestS.o .libs/lt-gctest
+libtool: clean: rmdir .libs >/dev/null 2>&1
+Executing on host: ../libtool --silent --tag=CC --mode=link  /root/gcc-build/test/control/build/gcc/xgcc -B/root/gcc-build/test/control/build/gcc/ /root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.c/leak_test.c /root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/libgcjgc.la  -O2  -I/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/include -I/root/gcc-build/test/control/src/boehm-gc/testsuite/../include   -Wc,-shared-libgcc -lpthread -ldl -lm   -o ./leak_test    (timeout = 300)
+spawn -ignore SIGHUP ../libtool --silent --tag=CC --mode=link /root/gcc-build/test/control/build/gcc/xgcc -B/root/gcc-build/test/control/build/gcc/ /root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.c/leak_test.c /root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/libgcjgc.la -O2 -I/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/include -I/root/gcc-build/test/control/src/boehm-gc/testsuite/../include -Wc,-shared-libgcc -lpthread -ldl -lm -o ./leak_test
+PASS: boehm-gc.c/leak_test.c -O2 (test for excess errors)
+Setting LD_LIBRARY_PATH to .:/root/gcc-build/test/control/build/gcc:/root/gcc-build/test/control/build/gcc/32:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/.libs:.libs:.:/root/gcc-build/test/control/build/gcc:/root/gcc-build/test/control/build/gcc/32:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/.libs:.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libstdc++-v3/src/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libsanitizer/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libvtv/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libcilkrts/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libssp/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libgomp/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libitm/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libatomic/.libs:/root/gcc-build/test/control/build/./gcc:/root/gcc-build/test/control/build/./prev-gcc:/root/gcc-build/dep-prefix/lib:/root/gcc-build/dep-prefix/lib
+spawn [open ...]
+Leaked composite object at 0x7f66a53b0ef0 (/root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.c/leak_test.c:16, sz=8, NORMAL)
+
+PASS: boehm-gc.c/leak_test.c -O2 execution test
+Executing on host: ../libtool --mode=clean rm -f  leak_test    (timeout = 300)
+spawn -ignore SIGHUP ../libtool --mode=clean rm -f leak_test
+libtool: clean: rm -f leak_test .libs/leak_test .libs/leak_testS.o .libs/lt-leak_test
+libtool: clean: rmdir .libs >/dev/null 2>&1
+Executing on host: ../libtool --silent --tag=CC --mode=link  /root/gcc-build/test/control/build/gcc/xgcc -B/root/gcc-build/test/control/build/gcc/ /root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.c/middle.c /root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/libgcjgc.la  -O2  -I/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/include -I/root/gcc-build/test/control/src/boehm-gc/testsuite/../include   -Wc,-shared-libgcc -lpthread -ldl -lm   -o ./middle    (timeout = 300)
+spawn -ignore SIGHUP ../libtool --silent --tag=CC --mode=link /root/gcc-build/test/control/build/gcc/xgcc -B/root/gcc-build/test/control/build/gcc/ /root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.c/middle.c /root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/libgcjgc.la -O2 -I/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/include -I/root/gcc-build/test/control/src/boehm-gc/testsuite/../include -Wc,-shared-libgcc -lpthread -ldl -lm -o ./middle
+PASS: boehm-gc.c/middle.c -O2 (test for excess errors)
+Setting LD_LIBRARY_PATH to .:/root/gcc-build/test/control/build/gcc:/root/gcc-build/test/control/build/gcc/32:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/.libs:.libs:.:/root/gcc-build/test/control/build/gcc:/root/gcc-build/test/control/build/gcc/32:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/.libs:.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libstdc++-v3/src/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libsanitizer/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libvtv/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libcilkrts/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libssp/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libgomp/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libitm/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libatomic/.libs:/root/gcc-build/test/control/build/./gcc:/root/gcc-build/test/control/build/./prev-gcc:/root/gcc-build/dep-prefix/lib:/root/gcc-build/dep-prefix/lib
+spawn [open ...]
+Final heap size is 131072
+PASS: boehm-gc.c/middle.c -O2 execution test
+Executing on host: ../libtool --mode=clean rm -f  middle    (timeout = 300)
+spawn -ignore SIGHUP ../libtool --mode=clean rm -f middle
+libtool: clean: rm -f middle .libs/middle .libs/middleS.o .libs/lt-middle
+libtool: clean: rmdir .libs >/dev/null 2>&1
+Executing on host: ../libtool --silent --tag=CC --mode=link  /root/gcc-build/test/control/build/gcc/xgcc -B/root/gcc-build/test/control/build/gcc/ /root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.c/thread_leak_test.c /root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/libgcjgc.la  -O2  -I/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/include -I/root/gcc-build/test/control/src/boehm-gc/testsuite/../include   -Wc,-shared-libgcc -lpthread -ldl -lm   -o ./thread_leak_test    (timeout = 300)
+spawn -ignore SIGHUP ../libtool --silent --tag=CC --mode=link /root/gcc-build/test/control/build/gcc/xgcc -B/root/gcc-build/test/control/build/gcc/ /root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.c/thread_leak_test.c /root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/libgcjgc.la -O2 -I/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/include -I/root/gcc-build/test/control/src/boehm-gc/testsuite/../include -Wc,-shared-libgcc -lpthread -ldl -lm -o ./thread_leak_test
+PASS: boehm-gc.c/thread_leak_test.c -O2 (test for excess errors)
+Setting LD_LIBRARY_PATH to .:/root/gcc-build/test/control/build/gcc:/root/gcc-build/test/control/build/gcc/32:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/.libs:.libs:.:/root/gcc-build/test/control/build/gcc:/root/gcc-build/test/control/build/gcc/32:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/.libs:.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libstdc++-v3/src/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libsanitizer/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libvtv/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libcilkrts/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libssp/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libgomp/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libitm/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libatomic/.libs:/root/gcc-build/test/control/build/./gcc:/root/gcc-build/test/control/build/./prev-gcc:/root/gcc-build/dep-prefix/lib:/root/gcc-build/dep-prefix/lib
+spawn [open ...]
+Leaked composite object at 0x7fbc736cefe0 (/root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.c/thread_leak_test.c:21, sz=4, NORMAL)
+
+Leaked composite object at start: 0x7fbc736ccfa0, appr. length: 40
+Leaked composite object at 0x7fbc736cef20 (/root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.c/thread_leak_test.c:21, sz=4, NORMAL)
+
+Leaked composite object at start: 0x7fbc736ccf78, appr. length: 40
+Leaked composite object at 0x7fbc736ceef0 (/root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.c/thread_leak_test.c:21, sz=4, NORMAL)
+
+Leaked composite object at start: 0x7fbc736ccfa0, appr. length: 40
+Leaked composite object at 0x7fbc736cefe0 (/root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.c/thread_leak_test.c:21, sz=4, NORMAL)
+
+Leaked composite object at start: 0x7fbc736ccf78, appr. length: 40
+Leaked composite object at 0x7fbc736cef20 (/root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.c/thread_leak_test.c:21, sz=4, NORMAL)
+
+Leaked composite object at start: 0x7fbc736ccfa0, appr. length: 40
+PASS: boehm-gc.c/thread_leak_test.c -O2 execution test
+Executing on host: ../libtool --mode=clean rm -f  thread_leak_test    (timeout = 300)
+spawn -ignore SIGHUP ../libtool --mode=clean rm -f thread_leak_test
+libtool: clean: rm -f thread_leak_test .libs/thread_leak_test .libs/thread_leak_testS.o .libs/lt-thread_leak_test
+libtool: clean: rmdir .libs >/dev/null 2>&1
+UNSUPPORTED: boehm-gc.c/trace_test.c -O2
+Executing on host: ../libtool --mode=clean rm -f  trace_test    (timeout = 300)
+spawn -ignore SIGHUP ../libtool --mode=clean rm -f trace_test
+testcase /root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.c/c.exp completed in 4 seconds
+Running /root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.lib/lib.exp ...
+set_ld_library_path_env_vars: ld_library_path=.:/root/gcc-build/test/control/build/gcc:/root/gcc-build/test/control/build/gcc/32:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/.libs:.libs
+dg-add-shlib /root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.lib/staticrootslib.c
+Executing on host: ../libtool --silent --tag=CC --mode=compile  /root/gcc-build/test/control/build/gcc/xgcc -B/root/gcc-build/test/control/build/gcc/  -O2  -I/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/include -I/root/gcc-build/test/control/src/boehm-gc/testsuite/../include  -c  -o staticrootslib.lo /root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.lib/staticrootslib.c    (timeout = 300)
+spawn -ignore SIGHUP ../libtool --silent --tag=CC --mode=compile /root/gcc-build/test/control/build/gcc/xgcc -B/root/gcc-build/test/control/build/gcc/ -O2 -I/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/include -I/root/gcc-build/test/control/src/boehm-gc/testsuite/../include -c -o staticrootslib.lo /root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.lib/staticrootslib.c
+PASS: boehm-gc.lib/staticrootslib.c -O2 (test for excess errors)
+Executing on host: ../libtool --silent --tag=CC --mode=link  /root/gcc-build/test/control/build/gcc/xgcc -B/root/gcc-build/test/control/build/gcc/ staticrootslib.lo /root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/libgcjgc_convenience.la  -O2  -version-info 1:2:0 -no-undefined -rpath /nowhere -I/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/include -I/root/gcc-build/test/control/src/boehm-gc/testsuite/../include   -Wc,-shared-libgcc -lpthread -ldl -lm   -o libstaticrootslib.la    (timeout = 300)
+spawn -ignore SIGHUP ../libtool --silent --tag=CC --mode=link /root/gcc-build/test/control/build/gcc/xgcc -B/root/gcc-build/test/control/build/gcc/ staticrootslib.lo /root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/libgcjgc_convenience.la -O2 -version-info 1:2:0 -no-undefined -rpath /nowhere -I/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/include -I/root/gcc-build/test/control/src/boehm-gc/testsuite/../include -Wc,-shared-libgcc -lpthread -ldl -lm -o libstaticrootslib.la
+PASS: staticrootslib.lo -O2 (test for excess errors)
+Executing on host: ../libtool --mode=clean rm -f staticrootslib.lo   (timeout = 300)
+spawn -ignore SIGHUP ../libtool --mode=clean rm -f staticrootslib.lo
+libtool: clean: rm -f staticrootslib.lo ./.libs/staticrootslib.o ./staticrootslib.o
+libtool: clean: rmdir .libs >/dev/null 2>&1
+Executing on host: ../libtool --silent --tag=CC --mode=link  /root/gcc-build/test/control/build/gcc/xgcc -B/root/gcc-build/test/control/build/gcc/ /root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.lib/staticrootstest.c /root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/libgcjgc.la  -O2 libstaticrootslib.la  -I/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/include -I/root/gcc-build/test/control/src/boehm-gc/testsuite/../include   -Wc,-shared-libgcc -lpthread -ldl -lm   -o ./staticrootstest    (timeout = 300)
+spawn -ignore SIGHUP ../libtool --silent --tag=CC --mode=link /root/gcc-build/test/control/build/gcc/xgcc -B/root/gcc-build/test/control/build/gcc/ /root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.lib/staticrootstest.c /root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/libgcjgc.la -O2 libstaticrootslib.la -I/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/include -I/root/gcc-build/test/control/src/boehm-gc/testsuite/../include -Wc,-shared-libgcc -lpthread -ldl -lm -o ./staticrootstest
+PASS: boehm-gc.lib/staticrootstest.c -O2 (test for excess errors)
+Setting LD_LIBRARY_PATH to .:/root/gcc-build/test/control/build/gcc:/root/gcc-build/test/control/build/gcc/32:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/.libs:.libs:.:/root/gcc-build/test/control/build/gcc:/root/gcc-build/test/control/build/gcc/32:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/./boehm-gc/.libs:.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libstdc++-v3/src/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libsanitizer/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libvtv/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libcilkrts/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libssp/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libgomp/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libitm/.libs:/root/gcc-build/test/control/build/x86_64-unknown-linux-gnu/libatomic/.libs:/root/gcc-build/test/control/build/./gcc:/root/gcc-build/test/control/build/./prev-gcc:/root/gcc-build/dep-prefix/lib:/root/gcc-build/dep-prefix/lib
+spawn [open ...]
+PASS: boehm-gc.lib/staticrootstest.c -O2 execution test
+Executing on host: ../libtool --mode=clean rm -f  staticrootstest libstaticrootslib.la   (timeout = 300)
+spawn -ignore SIGHUP ../libtool --mode=clean rm -f staticrootstest libstaticrootslib.la
+libtool: clean: rm -f staticrootstest .libs/staticrootstest .libs/staticrootstestS.o .libs/lt-staticrootstest
+libtool: clean: rm -f libstaticrootslib.la .libs/libstaticrootslib.so.1.0.2 .libs/libstaticrootslib.so.1 .libs/libstaticrootslib.so .libs/libstaticrootslib.a .libs/libstaticrootslib.la .libs/libstaticrootslib.lai
+libtool: clean: rmdir .libs >/dev/null 2>&1
+testcase /root/gcc-build/test/control/src/boehm-gc/testsuite/boehm-gc.lib/lib.exp completed in 2 seconds
+
+		=== boehm-gc Summary ===
+
+# of expected passes		12
+# of unsupported tests		1
+runtest completed at Fri Nov 22 22:08:02 2013
