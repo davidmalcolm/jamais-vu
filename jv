@@ -300,7 +300,12 @@ class TestRun:
     def make_dict_by_rel_path(self):
         result = {}
         for sumfile in self.sumfiles:
-            result[sumfile.relative_path(self.path)] = sumfile
+            rel_path = sumfile.relative_path(self.path)
+            # Special-case for a run specifiying an individual .sum file:
+            # use just the filename, rather than ".":
+            if rel_path == '.':
+                rel_path = os.path.basename(sumfile.path)
+            result[rel_path] = sumfile
         return result
 
     def compare(self, other):
@@ -749,7 +754,7 @@ class TestTestRun(unittest.TestCase):
     def test_individual_sum_file(self):
         runA = TestRun('control/g++.sum', None)
         dict_by_rel_pathA = runA.make_dict_by_rel_path()
-        sumfileA = dict_by_rel_pathA['.']
+        sumfileA = dict_by_rel_pathA['g++.sum']
         self.assertEqual(sumfileA.path, 'control/g++.sum')
 
     def test_bogus_path(self):
@@ -1232,12 +1237,11 @@ class TestComparisonCommand(CommandTest):
         out = self.cmd(['compare',
                         'test-with-log-files/old/boehm-gc.sum',
                         'test-with-log-files/new/boehm-gc.sum'])
-        # TODO: the "." in this output could be improved
         self.assertMultiLineEqual(out,
                                   'Comparing 1 common .sum files\n'
                                   '-----------------------------\n'
                                   '\n'
-                                  ' . : total: 13 PASS: 12 UNSUPPORTED: 1\n'
+                                  ' boehm-gc.sum : total: 13 PASS: 12 UNSUPPORTED: 1\n'
                                   '\n'
                                   'No differences found in 1 common .sum files\n')
 
