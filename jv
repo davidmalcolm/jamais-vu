@@ -21,13 +21,13 @@
 from collections import namedtuple
 import difflib
 import io
-import mock
 import os
 import re
 import sys
 import unittest
+import unittest.mock
 
-import cmdln  # in Fedora as "python-cmdln"
+import cmdln  # in Fedora as "python3-cmdln"
 
 OUTCOMES='FAIL PASS XFAIL KFAIL XPASS KPASS UNTESTED UNRESOLVED UNSUPPORTED'.split()
 
@@ -695,7 +695,7 @@ class JV(cmdln.Cmdln):
         unittest.main(argv=[sys.argv[0], '-v'])
 
 def mock_stdout():
-    return mock.patch('sys.stdout', new=io.StringIO())
+    return unittest.mock.patch('sys.stdout', new=io.StringIO())
 
 def get_first_lines(data, count):
     lines = data.splitlines()
