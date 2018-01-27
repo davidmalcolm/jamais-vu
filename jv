@@ -29,7 +29,8 @@ import unittest.mock
 
 import cmdln  # in Fedora as "python3-cmdln"
 
-OUTCOMES='FAIL PASS XFAIL KFAIL XPASS KPASS UNTESTED UNRESOLVED UNSUPPORTED'.split()
+OUTCOMES = 'FAIL PASS XFAIL KFAIL XPASS KPASS UNTESTED UNRESOLVED UNSUPPORTED'.split()
+
 
 def locate_exp_files(source_path):
     """
@@ -45,6 +46,7 @@ def locate_exp_files(source_path):
 ############################################################################
 # .sum and .log files
 ############################################################################
+
 
 class TestId(namedtuple('TestId', ['testname', 'index'])):
     """
@@ -67,10 +69,12 @@ class TestId(namedtuple('TestId', ['testname', 'index'])):
            106,
            106)
         and given this testname:
-          "g++.dg/diagnostic/param-type-mismatch.C  -std=gnu++11  expected multiline pattern lines 108-109 was found: "   return ptr->member_1 \(first, second, third\);.*\n                                             \^\n"
+          ('g++.dg/diagnostic/param-type-mismatch.C  -std=gnu++11  expected multiline pattern lines 108-109 was found: "   '
+           'return ptr->member_1 \(first, second, third\);.*\n                                             \^\n')
         return:
           ('g++.dg/diagnostic/param-type-mismatch.C',
-           '  -std=gnu++11  expected multiline pattern lines    return ptr->member_1 \\(first, second, third\\);.*\\n                                             \\^\\n',
+           '  -std=gnu++11  expected multiline pattern lines    return ptr->member_1 \\(first, second, third\\);.*\\n      '
+           '                                       \\^\\n',
            108,
            109)
         and given this testname w/o any line numbers:
@@ -85,10 +89,10 @@ class TestId(namedtuple('TestId', ['testname', 'index'])):
         m = re.match('(\S+)(.*expected multiline pattern lines )([0-9]+)-([0-9]+) was found: "(.*)"',
                      self.testname)
         if m:
-            #print(m.groups())
             filename, details_a, linenum_a, linenum_b, details_b = m.groups()
             return (filename, details_a + details_b,
                     int(linenum_a), int(linenum_b))
+
 
 class DejaFile:
     """
@@ -129,7 +133,6 @@ class DejaFile:
                          for outcome in OUTCOMES]
 
         for idx, line in enumerate(f):
-            #print(repr((idx, line)))
             for outcome, PATTERN in PATTERN_PAIRS:
                 m = re.match(PATTERN, line)
                 if m:
@@ -144,7 +147,7 @@ class DejaFile:
                     self.testid_to_outcome[testid] = outcome
                     self.testid_to_lineidx[testid] = idx
                     self.outcome_to_testids[outcome].add(testid)
-                    break # OUTCOMES loop
+                    break  # OUTCOMES loop
 
     def find(self, search_testname):
         result = 0
@@ -205,6 +208,7 @@ class DejaFile:
             result[filename] = src
         return result
 
+
 class LogFile(DejaFile):
     """
     A .log file from dejagnu
@@ -214,6 +218,7 @@ class LogFile(DejaFile):
 
     def __repr__(self):
         return 'LogFile(%r)' % self.path
+
 
 class SumFile(DejaFile):
     """
@@ -264,6 +269,7 @@ class SumFile(DejaFile):
                            % (outcome, self.get_count_by_outcome(outcome)))
         tr.end_section()
 
+
 class TestRun:
     """
     A collection of .sum files (and their .log files); either
@@ -305,7 +311,7 @@ class TestRun:
             tr.begin_section(sumfile.path)
             for outcome in OUTCOMES:
                 tr.begin_section('%s: %i tests'
-                                 % (outcome, sumfile.get_count_by_outcome (outcome)))
+                                 % (outcome, sumfile.get_count_by_outcome(outcome)))
                 for testid in sorted(sumfile.outcome_to_testids[outcome]):
                     tr.writeln(testid.testname)
                 tr.end_section()
@@ -324,6 +330,7 @@ class TestRun:
 ############################################################################
 # Various kinds of output
 ############################################################################
+
 
 class TextReporter:
     def __init__(self):
@@ -349,10 +356,12 @@ class TextReporter:
 # Implementation details of "do_compare"
 ############################################################################
 
+
 class TotalByOutcome(dict):
     def __init__(self):
         for outcome in OUTCOMES:
             self[outcome] = 0
+
 
 def make_count_text(desc, countA, countB, with_percent=False):
     if countA == countB:
@@ -368,9 +377,11 @@ def make_count_text(desc, countA, countB, with_percent=False):
             result += ' %2.2f%%' % percent
         return result
 
+
 def read_lines(path):
     with open(path) as f:
         return f.readlines()
+
 
 class LineMatcher:
     """
@@ -391,13 +402,13 @@ class LineMatcher:
         """
         zero_based_linenumA = linenumA - 1
         for m in self.matching_blocks:
-            #print(repr(m))
             if zero_based_linenumA >= m.a \
                and zero_based_linenumA < m.a + m.size:
                 offset = zero_based_linenumA - m.a
                 zero_based_linenumB = m.b + offset
                 linenumB = zero_based_linenumB + 1
                 return linenumB
+
 
 def remap_for_changing_line_numbers(sumfileA, testidsA,
                                     sumfileB, testidsB):
@@ -429,7 +440,7 @@ def remap_for_changing_line_numbers(sumfileA, testidsA,
             continue
         if filenameA not in new_files:
             continue
-        if not filenameA in line_matchers_by_filename:
+        if filenameA not in line_matchers_by_filename:
             line_matchers_by_filename[filenameA] \
                 = LineMatcher(missing_files[filenameA],
                               new_files[filenameA])
@@ -440,7 +451,6 @@ def remap_for_changing_line_numbers(sumfileA, testidsA,
         expected_endlineB = lm.get(endlineA)
         if expected_endlineB is None:
             continue
-        #print('got here: %r %r' % (testidA, expected_linenumB))
         # TODO: avoid O(N^2) here?
         for testidB in new:
             line_num_infoB = testidB.get_line_num_info()
@@ -469,6 +479,7 @@ def remap_for_changing_line_numbers(sumfileA, testidsA,
             break
 
     return testidsA, testidsB
+
 
 class Comparison:
     def __init__(self,
@@ -607,6 +618,7 @@ class Comparison:
                                                outcome == 'PASS'))
             tr.end_section()
 
+
 class SourcelessComparison(Comparison):
     def __init__(self, before_path, after_path):
         Comparison.__init__(self, before_path, None, after_path, None)
@@ -614,6 +626,7 @@ class SourcelessComparison(Comparison):
 ############################################################################
 # Command-line interface
 ############################################################################
+
 
 class JV(cmdln.Cmdln):
     name = 'jv'
@@ -694,13 +707,16 @@ class JV(cmdln.Cmdln):
         """
         unittest.main(argv=[sys.argv[0], '-v'])
 
+
 def mock_stdout():
     return unittest.mock.patch('sys.stdout', new=io.StringIO())
+
 
 def get_first_lines(data, count):
     lines = data.splitlines()
     lines = lines[:count]
     return ''.join(line + '\n' for line in lines)
+
 
 class TestSupportFunctions(unittest.TestCase):
     def test_locate_exp_files(self):
@@ -722,6 +738,7 @@ class TestSupportFunctions(unittest.TestCase):
         self.assertMultiLineEqual(get_first_lines(THREE_LINES, 4),
                                   THREE_LINES)
 
+
 class TestTestRun(unittest.TestCase):
     def test_finding_sum_files_recursively(self):
         runA = TestRun('control', None)
@@ -739,6 +756,7 @@ class TestTestRun(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,
                                     'expected a directory or a .sum file'):
             runA = TestRun('Makefile', None)
+
 
 class TestSumFile(unittest.TestCase):
     @classmethod
@@ -784,6 +802,7 @@ class TestSumFile(unittest.TestCase):
             self.assertIn(testid, self.sumfile.outcome_to_testids['PASS'])
             self.assertEqual(self.sumfile.testid_to_lineidx[testid], 18456 + i)
 
+
 class TestComparison(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -827,6 +846,7 @@ class TestComparison(unittest.TestCase):
                                   '  XFAIL: 434\n'
                                   '  UNSUPPORTED: 4697\n'
                                   '\n')
+
 
 class TestComparisonSumFileAppears(unittest.TestCase):
     """
@@ -885,6 +905,7 @@ class TestComparisonSumFileAppears(unittest.TestCase):
             '\n')
         self.assertMultiLineEqual(fake_stdout.getvalue(), EXPECTED)
 
+
 class TestComparisonSumFileDisappears(unittest.TestCase):
     """
     Test what happens when a .sum file disappears (by comparing against
@@ -942,6 +963,7 @@ class TestComparisonSumFileDisappears(unittest.TestCase):
             '\n')
         self.assertMultiLineEqual(fake_stdout.getvalue(), EXPECTED)
 
+
 class TestSelfComparison(unittest.TestCase):
     """
     Test what happens when nothing changes (by comparing a directory
@@ -981,6 +1003,7 @@ class TestSelfComparison(unittest.TestCase):
             self.c.conclusion(tr)
         EXPECTED = 'No differences found in 1 common .sum files\n'
         self.assertMultiLineEqual(fake_stdout.getvalue(), EXPECTED)
+
 
 class TestEmptyComparison(unittest.TestCase):
     """
@@ -1025,6 +1048,7 @@ class TestEmptyComparison(unittest.TestCase):
             '\n')
         self.assertMultiLineEqual(fake_stdout.getvalue(), EXPECTED)
 
+
 class TestRemappingLineNumbers(unittest.TestCase):
     """
     Verify the machinery for suppressing testcases that purely change
@@ -1047,7 +1071,6 @@ class TestRemappingLineNumbers(unittest.TestCase):
         self.assertEqual(sumfileB.locate_source_file('g++.dg/plugin/diagnostic-test-expressions-1.C'),
                          'test-changing-linenums/new/src/gcc/testsuite/g++.dg/plugin/diagnostic-test-expressions-1.C')
 
-
     def get_test_testid(self):
         TESTNAME = 'g++.dg/diagnostic/param-type-mismatch.C  -std=gnu++11  (test for errors, line 106)'
         return TestId(TESTNAME, 0)
@@ -1059,11 +1082,14 @@ class TestRemappingLineNumbers(unittest.TestCase):
                           '  -std=gnu++11  (test for errors',
                           106, 106))
 
-        TESTNAME_2 = r'g++.dg/diagnostic/param-type-mismatch.C  -std=gnu++11  expected multiline pattern lines 108-109 was found: "   return ptr->member_1 \(first, second, third\);.*\n                                             \^\n"'
+        TESTNAME_2 = (r'g++.dg/diagnostic/param-type-mismatch.C  -std=gnu++11  expected multiline pattern lines 108-109'
+                      r' was found: "   return ptr->member_1 \(first, second, third\);.*\n                              '
+                      r'               \^\n"')
         testid_2 = TestId(TESTNAME_2, 0)
         self.assertEqual(testid_2.get_line_num_info(),
                          ('g++.dg/diagnostic/param-type-mismatch.C',
-                          '  -std=gnu++11  expected multiline pattern lines    return ptr->member_1 \\(first, second, third\\);.*\\n                                             \\^\\n',
+                          ('  -std=gnu++11  expected multiline pattern lines    return ptr->member_1 \\(first, second, '
+                           'third\\);.*\\n                                             \\^\\n'),
                           108, 109))
 
         TESTNAME_3 = 'g++.dg/diagnostic/nested-name-1.C  -std=gnu++98 (test for excess errors)'
@@ -1118,7 +1144,9 @@ class TestRemappingLineNumbers(unittest.TestCase):
         # Again, but for a multiline test, moving from lines 260-261 in
         # old source tree to lines 345-346.
 
-        TESTNAME_A = r'g++.dg/plugin/diagnostic-test-expressions-1.C -fplugin=./diagnostic_plugin_test_tree_expression_range.so  expected multiline pattern lines 260-261 was found: "   __emit_expression_range \(0, lhs / rhs \);.*\n                               ~~~~\^~~~~\n"'
+        TESTNAME_A = (r'g++.dg/plugin/diagnostic-test-expressions-1.C -fplugin=./diagnostic_plugin_test_tree_expression'
+                      r'_range.so  expected multiline pattern lines 260-261 was found: "   __emit_expression_range \(0, '
+                      r'lhs / rhs \);.*\n                               ~~~~\^~~~~\n"')
         TESTNAME_B = TESTNAME_A.replace('260', '345')
         TESTNAME_B = TESTNAME_B.replace('261', '346')
         self.assertIn('345-346', TESTNAME_B)
@@ -1147,6 +1175,7 @@ class TestRemappingLineNumbers(unittest.TestCase):
         self.assertEqual(testidsA, set([testidA]))
         self.assertEqual(testidsB, set([testidB]))
 
+
 class TestComparisonWithSource(unittest.TestCase):
     """
     Verify that the presence of source files allows us to suppress tests
@@ -1164,9 +1193,9 @@ class TestComparisonWithSource(unittest.TestCase):
         self.assertIn('g++.sum : total: 369->379 (+10) PASS: 369->379 (+10)\n',
                       fake_stdout.getvalue())
         self.assertIn('Tests that went away in gcc/testsuite/g++/g++.sum: 89',
-                      fake_stdout.getvalue()) # would be 323 without suppression
+                      fake_stdout.getvalue())  # would be 323 without suppression
         self.assertIn('Tests appeared in gcc/testsuite/g++/g++.sum: 99',
-                      fake_stdout.getvalue()) # would be 333 without suppression
+                      fake_stdout.getvalue())  # would be 333 without suppression
 
     def test_conclusion(self):
         with mock_stdout() as fake_stdout:
@@ -1180,6 +1209,7 @@ class TestComparisonWithSource(unittest.TestCase):
                                   '  PASS: 369->379 (+10) 102.71%\n'
                                   '\n')
 
+
 class CommandTest(unittest.TestCase):
     """
     Subclass for implementing integration tests for a command.
@@ -1192,6 +1222,7 @@ class CommandTest(unittest.TestCase):
         with mock_stdout() as fake_stdout:
             jv.main(['jv'] + args)
         return fake_stdout.getvalue()
+
 
 class TestComparisonCommand(CommandTest):
     """
@@ -1222,6 +1253,7 @@ class TestComparisonCommand(CommandTest):
                                   '\n'
                                   'No differences found in 1 common .sum files\n')
 
+
 class TestDump(CommandTest):
     """
     Integration testing for the "dump" command
@@ -1235,7 +1267,8 @@ class TestDump(CommandTest):
                                   ' FAIL: 8 tests\n'
                                   ' -------------\n'
                                   '\n'
-                                  '  g++.dg/ipa/devirt-22.C  -std=gnu++11  scan-ipa-dump-times cp "Discovered a virtual call to a known target" 1 (found 2 times)\n')
+                                  '  g++.dg/ipa/devirt-22.C  -std=gnu++11  scan-ipa-dump-times cp "Discovered a virtual call to'
+                                  ' a known target" 1 (found 2 times)\n')
         self.assertIn('PASS: 119872 tests', out)
 
     def test_dumping_one_file(self):
@@ -1245,6 +1278,7 @@ class TestDump(CommandTest):
     def test_dumping_directory(self):
         out = self.cmd(['dump', 'control'])
         self.verify_output(out)
+
 
 class TestFind(CommandTest):
     """
@@ -1277,6 +1311,7 @@ class TestFind(CommandTest):
         self.assertMultiLineEqual(out,
                                   'control/g++.sum:124888: UNSUPPORTED: g++.old-deja/g++.warn/cast-align1.C  -std=gnu++11\n')
 
+
 class TestSummarize(CommandTest):
     """
     Integration testing for the "summarize" command
@@ -1304,6 +1339,7 @@ class TestSummarize(CommandTest):
                                   '\n'
                                   ' PASS: 369 tests\n'
                                   '\n')
+
 
 if __name__ == "__main__":
     jv = JV()
