@@ -1,0 +1,2 @@
+PASS:  test-arith-overflow.c.exe iteration 1 of 5: verify_uint_overflow_fn: actual: actual_ovf == expected: expected_ovf
+PASS:  test-arith-overflow.c.exe iteration 5 of 5: verify_uint_overflow_fn: actua

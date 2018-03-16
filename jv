@@ -556,10 +556,38 @@ class Comparison:
                 self.total_by_outcomeB[outcome] += countB
             tr.writeln('%s :%s' % (relpath, outcome_text))
 
+    def libgccjit_workaround(self, tr, sumfileA, sumfileB):
+        """
+        Subroutine of detailed_comparison.
+        Workaround for bug with jit.sum:
+          https://gcc.gnu.org/bugzilla/show_bug.cgi?id=69435
+        which leads to unpredictable splitting/truncation of
+        test names.
+        Workaround it by not attempting to compare test names
+        within jit.sum; just compare the count for each outcome,
+        and complain if any are different.
+        """
+        section = False
+        for outcome in OUTCOMES:
+            countA = sumfileA.get_count_by_outcome(outcome)
+            countB = sumfileB.get_count_by_outcome(outcome)
+            if countA != countB:
+                if not section:
+                    section = True
+                    tr.begin_section('Changes to jit.sum')
+                tr.writeln(make_count_text(outcome, countA, countB))
+                self.issue_count += 1
+        if section:
+            tr.end_section()
+
     def detailed_comparison(self, tr):
         for relpath in sorted(self.relpathsA & self.relpathsB):
             sumfileA = self.dict_by_rel_pathA[relpath]
             sumfileB = self.dict_by_rel_pathB[relpath]
+
+            if os.path.basename(sumfileA.path) == 'jit.sum':
+                self.libgccjit_workaround(tr, sumfileA, sumfileB)
+                continue
 
             # Compare the individual tests
             testidsA = set(sumfileA.testid_to_outcome.keys())
@@ -1256,6 +1284,42 @@ class TestComparisonCommand(CommandTest):
                                   ' boehm-gc.sum : total: 13 PASS: 12 UNSUPPORTED: 1\n'
                                   '\n'
                                   'No differences found in 1 common .sum files\n')
+
+    def test_jit_workaround_clean(self):
+        out = self.cmd(['compare',
+                        'testdata/jit-workaround/clean/old',
+                        'testdata/jit-workaround/clean/new'])
+        self.assertMultiLineEqual(out,
+                                  'Comparing 1 common .sum files\n'
+                                  '-----------------------------\n'
+                                  '\n'
+                                  ' jit.sum : total: 2 PASS: 2\n'
+                                  '\n'
+                                  'No differences found in 1 common .sum files\n')
+
+    def test_jit_workaround_new_failure(self):
+        out = self.cmd(['compare',
+                        'testdata/jit-workaround/new-failure/old',
+                        'testdata/jit-workaround/new-failure/new'])
+        self.assertMultiLineEqual(out,
+                                  'Comparing 1 common .sum files\n'
+                                  '-----------------------------\n'
+                                  '\n'
+                                  ' jit.sum : total: 25->9 (-16) FAIL: 0->2 (+2) PASS: 25->7 (-18)\n'
+                                  '\n'
+                                  'Changes to jit.sum\n'
+                                  '------------------\n'
+                                  '\n'
+                                  '  FAIL: 0->2 (+2)\n'
+                                  '  PASS: 25->7 (-18)\n'
+                                  '\n'
+                                  'Summary\n'
+                                  '-------\n'
+                                  '\n'
+                                  '  # of .sum files: 1\n'
+                                  '  FAIL: 0->2 (+2)\n'
+                                  '  PASS: 25->7 (-18) 28.00%\n'
+                                  '\n')
 
 
 class TestDump(CommandTest):
