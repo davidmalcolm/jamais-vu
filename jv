@@ -165,6 +165,17 @@ class DejaFile:
     def get_count_by_outcome(self, outcome):
         return len(self.outcome_to_testids[outcome])
 
+    def count_outcomes(self, testids):
+        """
+        Return a TotalByOutcome for the given sequence of TestId instances,
+        all of which must be present.
+        """
+        total_by_outcome = TotalByOutcome()
+        for testid in testids:
+            outcome = self.testid_to_outcome[testid]
+            total_by_outcome[outcome] += 1
+        return total_by_outcome
+
     def locate_source_file(self, filename):
         """
         Given a filename within a testname
@@ -366,6 +377,16 @@ class TotalByOutcome(dict):
     def __init__(self):
         for outcome in OUTCOMES:
             self[outcome] = 0
+
+    def __str__(self):
+        result = ''
+        for outcome in OUTCOMES:
+            if not self[outcome]:
+                continue
+            if result:
+                result += ', '
+            result += '%s: %i' % (outcome, self[outcome])
+        return result
 
 
 def make_count_text(desc, countA, countB, with_percent=False):
@@ -597,8 +618,8 @@ class Comparison:
                                                   sumfileB, testidsB)
             missing_testids = testidsA - testidsB
             if missing_testids:
-                tr.begin_section('Tests that went away in %s: %i'
-                                 % (relpath, len(missing_testids)))
+                tr.begin_section('Tests that went away in %s: %s'
+                                 % (relpath, sumfileA.count_outcomes(missing_testids)))
                 for testid in sorted(missing_testids):
                     tr.writeln('%s: %s'
                                % (sumfileA.testid_to_outcome[testid],
@@ -608,8 +629,8 @@ class Comparison:
 
             new_testids = testidsB - testidsA
             if new_testids:
-                tr.begin_section('Tests appeared in %s: %i'
-                                 % (relpath, len(new_testids)))
+                tr.begin_section('Tests appeared in %s: %s'
+                                 % (relpath, sumfileB.count_outcomes(new_testids)))
                 for testid in sorted(new_testids):
                     tr.writeln('%s: %s'
                                % (sumfileB.testid_to_outcome[testid],
@@ -860,9 +881,9 @@ class TestComparison(unittest.TestCase):
         self.assertIn(' g++.sum : total: 125011->125021 (+10)'
                       ' FAIL: 8->11 (+3) PASS: 119872->119879 (+7)'
                       ' XFAIL: 434 UNSUPPORTED: 4697\n', fake_stdout.getvalue())
-        self.assertIn('Tests that went away in g++.sum: 323\n',
+        self.assertIn('Tests that went away in g++.sum: PASS: 323\n',
                       fake_stdout.getvalue())
-        self.assertIn('Tests appeared in g++.sum: 333\n',
+        self.assertIn('Tests appeared in g++.sum: PASS: 333\n',
                       fake_stdout.getvalue())
 
     def test_conclusion(self):
@@ -1225,9 +1246,9 @@ class TestComparisonWithSource(unittest.TestCase):
             self.c.compare_sum_files(tr)
         self.assertIn('g++.sum : total: 369->379 (+10) PASS: 369->379 (+10)\n',
                       fake_stdout.getvalue())
-        self.assertIn('Tests that went away in gcc/testsuite/g++/g++.sum: 89',
+        self.assertIn('Tests that went away in gcc/testsuite/g++/g++.sum: PASS: 89',
                       fake_stdout.getvalue())  # would be 323 without suppression
-        self.assertIn('Tests appeared in gcc/testsuite/g++/g++.sum: 99',
+        self.assertIn('Tests appeared in gcc/testsuite/g++/g++.sum: PASS: 99',
                       fake_stdout.getvalue())  # would be 333 without suppression
 
     def test_conclusion(self):
@@ -1320,6 +1341,12 @@ class TestComparisonCommand(CommandTest):
                                   '  FAIL: 0->2 (+2)\n'
                                   '  PASS: 25->7 (-18) 28.00%\n'
                                   '\n')
+
+    def test_new_failures(self):
+        out = self.cmd(['compare',
+                        'testdata/new-failures/old',
+                        'testdata/new-failures/new'])
+        self.assertIn('Tests appeared in gcc.sum: FAIL: 2, PASS: 12\n', out)
 
 
 class TestDump(CommandTest):

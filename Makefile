@@ -14,5 +14,8 @@ jit-workaround-clean:
 jit-workaround-new-failure:
 	./jv compare testdata/jit-workaround/new-failure/old testdata/jit-workaround/new-failure/new
 
+new-failure:
+	./jv compare testdata/new-failures/old/gcc.sum testdata/new-failures/new/gcc.sum
+
 pep8:
 	python3-pep8 jv

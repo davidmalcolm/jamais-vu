@@ -1,0 +1,7 @@
+PASS: gcc.dg/fixits.c  (test for errors, line 11)
+PASS: gcc.dg/fixits.c  (test for errors, line 23)
+PASS: gcc.dg/fixits.c  (test for errors, line 36)
+PASS: gcc.dg/fixits.c (test for excess errors)
+PASS: gcc.dg/fixits.c expected multiline pattern lines 13-15 was found: "\s*return ptr\.x;.*\n             \^\n             ->.*\n"
+PASS: gcc.dg/fixits.c expected multiline pattern lines 25-27 was found: "   return ptr\.x;.*\n             \^\n             ->.*\n"
+PASS: gcc.dg/fixits.c expected multiline pattern lines 38-39 was found: "   return ptr\.x;.*\n             \^\n"
