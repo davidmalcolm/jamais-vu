@@ -753,10 +753,10 @@ def get_first_lines(data, count):
 
 class TestSupportFunctions(unittest.TestCase):
     def test_locate_exp_files(self):
-        self.assertEqual(locate_exp_files('test-changing-linenums/old/src'),
-                         ['test-changing-linenums/old/src/gcc/testsuite/g++.dg/dg.exp'])
-        self.assertEqual(locate_exp_files('test-changing-linenums/new/src'),
-                         ['test-changing-linenums/new/src/gcc/testsuite/g++.dg/dg.exp'])
+        self.assertEqual(locate_exp_files('testdata/changing-linenums/old/src'),
+                         ['testdata/changing-linenums/old/src/gcc/testsuite/g++.dg/dg.exp'])
+        self.assertEqual(locate_exp_files('testdata/changing-linenums/new/src'),
+                         ['testdata/changing-linenums/new/src/gcc/testsuite/g++.dg/dg.exp'])
 
     def test_get_first_lines(self):
         self.assertMultiLineEqual(get_first_lines('', 0), '')
@@ -774,16 +774,16 @@ class TestSupportFunctions(unittest.TestCase):
 
 class TestTestRun(unittest.TestCase):
     def test_finding_sum_files_recursively(self):
-        runA = TestRun('control', None)
+        runA = TestRun('testdata/control', None)
         dict_by_rel_pathA = runA.make_dict_by_rel_path()
         sumfileA = dict_by_rel_pathA['g++.sum']
-        self.assertEqual(sumfileA.path, 'control/g++.sum')
+        self.assertEqual(sumfileA.path, 'testdata/control/g++.sum')
 
     def test_individual_sum_file(self):
-        runA = TestRun('control/g++.sum', None)
+        runA = TestRun('testdata/control/g++.sum', None)
         dict_by_rel_pathA = runA.make_dict_by_rel_path()
         sumfileA = dict_by_rel_pathA['g++.sum']
-        self.assertEqual(sumfileA.path, 'control/g++.sum')
+        self.assertEqual(sumfileA.path, 'testdata/control/g++.sum')
 
     def test_bogus_path(self):
         with self.assertRaisesRegex(ValueError,
@@ -794,15 +794,15 @@ class TestTestRun(unittest.TestCase):
 class TestSumFile(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.sumfile = SumFile('control/g++.sum', None)
+        cls.sumfile = SumFile('testdata/control/g++.sum', None)
 
     def test_summarize(self):
         tr = TextReporter()
         with mock_stdout() as fake_stdout:
             self.sumfile.summarize(tr)
         self.assertEqual(fake_stdout.getvalue(),
-                         'control/g++.sum\n'
-                         '---------------\n'
+                         'testdata/control/g++.sum\n'
+                         '------------------------\n'
                          '\n'
                          ' FAIL: 8 tests\n'
                          ' PASS: 119872 tests\n'
@@ -839,7 +839,7 @@ class TestSumFile(unittest.TestCase):
 class TestComparison(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.c = SourcelessComparison('control', 'experiment')
+        cls.c = SourcelessComparison('testdata/control', 'testdata/experiment')
 
     def test_print_missing_sum_files(self):
         with mock_stdout() as fake_stdout:
@@ -888,7 +888,7 @@ class TestComparisonSumFileAppears(unittest.TestCase):
     """
     @classmethod
     def setUpClass(cls):
-        cls.c = SourcelessComparison('empty', 'experiment')
+        cls.c = SourcelessComparison('testdata/empty', 'testdata/experiment')
 
     def test_print_missing_sum_files(self):
         with mock_stdout() as fake_stdout:
@@ -904,8 +904,8 @@ class TestComparisonSumFileAppears(unittest.TestCase):
             'sum files that appeared: 1\n'
             '--------------------------\n'
             '\n'
-            ' experiment/g++.sum\n'
-            ' ------------------\n'
+            ' testdata/experiment/g++.sum\n'
+            ' ---------------------------\n'
             '\n'
             '  FAIL: 11 tests\n'
             '  PASS: 119879 tests\n'
@@ -946,7 +946,7 @@ class TestComparisonSumFileDisappears(unittest.TestCase):
     """
     @classmethod
     def setUpClass(cls):
-        cls.c = SourcelessComparison('experiment', 'empty')
+        cls.c = SourcelessComparison('testdata/experiment', 'testdata/empty')
 
     def test_print_missing_sum_files(self):
         with mock_stdout() as fake_stdout:
@@ -956,8 +956,8 @@ class TestComparisonSumFileDisappears(unittest.TestCase):
             'sum files that went away: 1\n'
             '---------------------------\n'
             '\n'
-            ' experiment/g++.sum\n'
-            ' ------------------\n'
+            ' testdata/experiment/g++.sum\n'
+            ' ---------------------------\n'
             '\n'
             '  FAIL: 11 tests\n'
             '  PASS: 119879 tests\n'
@@ -1004,7 +1004,7 @@ class TestSelfComparison(unittest.TestCase):
     """
     @classmethod
     def setUpClass(cls):
-        cls.c = SourcelessComparison('experiment', 'experiment')
+        cls.c = SourcelessComparison('testdata/experiment', 'testdata/experiment')
 
     def test_print_missing_sum_files(self):
         with mock_stdout() as fake_stdout:
@@ -1044,7 +1044,7 @@ class TestEmptyComparison(unittest.TestCase):
     """
     @classmethod
     def setUpClass(cls):
-        cls.c = SourcelessComparison('empty', 'empty')
+        cls.c = SourcelessComparison('testdata/empty', 'testdata/empty')
 
     def test_print_missing_sum_files(self):
         with mock_stdout() as fake_stdout:
@@ -1088,21 +1088,21 @@ class TestRemappingLineNumbers(unittest.TestCase):
     their line number.
     """
     def test_locate_source_file(self):
-        sumfileA = SumFile('test-changing-linenums/old/build/gcc/testsuite/g++/g++.sum',
-                           source_path='test-changing-linenums/old/src')
+        sumfileA = SumFile('testdata/changing-linenums/old/build/gcc/testsuite/g++/g++.sum',
+                           source_path='testdata/changing-linenums/old/src')
         self.assertEqual(sumfileA.locate_source_file('does not exist'), None)
         self.assertEqual(sumfileA.locate_source_file('g++.dg/diagnostic/param-type-mismatch.C'),
-                         'test-changing-linenums/old/src/gcc/testsuite/g++.dg/diagnostic/param-type-mismatch.C')
+                         'testdata/changing-linenums/old/src/gcc/testsuite/g++.dg/diagnostic/param-type-mismatch.C')
         self.assertEqual(sumfileA.locate_source_file('g++.dg/plugin/diagnostic-test-expressions-1.C'),
-                         'test-changing-linenums/old/src/gcc/testsuite/g++.dg/plugin/diagnostic-test-expressions-1.C')
+                         'testdata/changing-linenums/old/src/gcc/testsuite/g++.dg/plugin/diagnostic-test-expressions-1.C')
 
-        sumfileB = SumFile('test-changing-linenums/new/build/gcc/testsuite/g++/g++.sum',
-                           source_path='test-changing-linenums/new/src')
+        sumfileB = SumFile('testdata/changing-linenums/new/build/gcc/testsuite/g++/g++.sum',
+                           source_path='testdata/changing-linenums/new/src')
         self.assertEqual(sumfileB.locate_source_file('does not exist'), None)
         self.assertEqual(sumfileB.locate_source_file('g++.dg/diagnostic/param-type-mismatch.C'),
-                         'test-changing-linenums/new/src/gcc/testsuite/g++.dg/diagnostic/param-type-mismatch.C')
+                         'testdata/changing-linenums/new/src/gcc/testsuite/g++.dg/diagnostic/param-type-mismatch.C')
         self.assertEqual(sumfileB.locate_source_file('g++.dg/plugin/diagnostic-test-expressions-1.C'),
-                         'test-changing-linenums/new/src/gcc/testsuite/g++.dg/plugin/diagnostic-test-expressions-1.C')
+                         'testdata/changing-linenums/new/src/gcc/testsuite/g++.dg/plugin/diagnostic-test-expressions-1.C')
 
     def get_test_testid(self):
         TESTNAME = 'g++.dg/diagnostic/param-type-mismatch.C  -std=gnu++11  (test for errors, line 106)'
@@ -1130,16 +1130,16 @@ class TestRemappingLineNumbers(unittest.TestCase):
         self.assertEqual(testid_3.get_line_num_info(), None)
 
     def test_get_filename_dict(self):
-        sumfile = SumFile('test-changing-linenums/old/build/gcc/testsuite/g++/g++.sum',
-                          source_path='test-changing-linenums/old/src')
+        sumfile = SumFile('testdata/changing-linenums/old/build/gcc/testsuite/g++/g++.sum',
+                          source_path='testdata/changing-linenums/old/src')
         testid = self.get_test_testid()
         d = sumfile.get_filename_dict(set([testid]))
         self.assertIn('g++.dg/diagnostic/param-type-mismatch.C', d)
         self.assertEqual(d['g++.dg/diagnostic/param-type-mismatch.C'],
-                         'test-changing-linenums/old/src/gcc/testsuite/g++.dg/diagnostic/param-type-mismatch.C')
+                         'testdata/changing-linenums/old/src/gcc/testsuite/g++.dg/diagnostic/param-type-mismatch.C')
 
     def test_line_matcher(self):
-        old = 'test-changing-linenums/old/src/gcc/testsuite/g++.dg/diagnostic/param-type-mismatch.C'
+        old = 'testdata/changing-linenums/old/src/gcc/testsuite/g++.dg/diagnostic/param-type-mismatch.C'
         new = old.replace('old', 'new')
         lm = LineMatcher(old, new)
 
@@ -1157,10 +1157,10 @@ class TestRemappingLineNumbers(unittest.TestCase):
         # First for a single line number, moving from line 106 in old
         # source tree to line 103 in new source tree.
 
-        sumfileA = SumFile('test-changing-linenums/old/build/gcc/testsuite/g++/g++.sum',
-                           source_path='test-changing-linenums/old/src')
-        sumfileB = SumFile('test-changing-linenums/new/build/gcc/testsuite/g++/g++.sum',
-                           source_path='test-changing-linenums/new/src')
+        sumfileA = SumFile('testdata/changing-linenums/old/build/gcc/testsuite/g++/g++.sum',
+                           source_path='testdata/changing-linenums/old/src')
+        sumfileB = SumFile('testdata/changing-linenums/new/build/gcc/testsuite/g++/g++.sum',
+                           source_path='testdata/changing-linenums/new/src')
 
         TESTNAME_A = 'g++.dg/diagnostic/param-type-mismatch.C  -std=gnu++11  (test for errors, line 106)'
         TESTNAME_B = TESTNAME_A.replace('106', '103')
@@ -1216,8 +1216,8 @@ class TestComparisonWithSource(unittest.TestCase):
     """
     @classmethod
     def setUpClass(cls):
-        cls.c = Comparison('test-changing-linenums/old/build', 'test-changing-linenums/old/src',
-                           'test-changing-linenums/new/build', 'test-changing-linenums/new/src')
+        cls.c = Comparison('testdata/changing-linenums/old/build', 'testdata/changing-linenums/old/src',
+                           'testdata/changing-linenums/new/build', 'testdata/changing-linenums/new/src')
 
     def test_compare_sum_files(self):
         with mock_stdout() as fake_stdout:
@@ -1263,8 +1263,8 @@ class TestComparisonCommand(CommandTest):
     """
     def test_compare_files(self):
         out = self.cmd(['compare',
-                        'test-with-log-files/old/boehm-gc.sum',
-                        'test-with-log-files/new/boehm-gc.sum'])
+                        'testdata/with-log/old/boehm-gc.sum',
+                        'testdata/with-log/new/boehm-gc.sum'])
         self.assertMultiLineEqual(out,
                                   'Comparing 1 common .sum files\n'
                                   '-----------------------------\n'
@@ -1275,8 +1275,8 @@ class TestComparisonCommand(CommandTest):
 
     def test_compare_directory(self):
         out = self.cmd(['compare',
-                        'test-with-log-files/old',
-                        'test-with-log-files/new'])
+                        'testdata/with-log/old',
+                        'testdata/with-log/new'])
         self.assertMultiLineEqual(out,
                                   'Comparing 1 common .sum files\n'
                                   '-----------------------------\n'
@@ -1329,8 +1329,8 @@ class TestDump(CommandTest):
     def verify_output(self, out):
         start = get_first_lines(out, 7)
         self.assertMultiLineEqual(start,
-                                  'control/g++.sum\n'
-                                  '---------------\n'
+                                  'testdata/control/g++.sum\n'
+                                  '------------------------\n'
                                   '\n'
                                   ' FAIL: 8 tests\n'
                                   ' -------------\n'
@@ -1340,11 +1340,11 @@ class TestDump(CommandTest):
         self.assertIn('PASS: 119872 tests', out)
 
     def test_dumping_one_file(self):
-        out = self.cmd(['dump', 'control/g++.sum'])
+        out = self.cmd(['dump', 'testdata/control/g++.sum'])
         self.verify_output(out)
 
     def test_dumping_directory(self):
-        out = self.cmd(['dump', 'control'])
+        out = self.cmd(['dump', 'testdata/control'])
         self.verify_output(out)
 
 
@@ -1356,18 +1356,18 @@ class TestFind(CommandTest):
 
     def test_find_within_one_file(self):
         out = self.cmd(['find', self.TESTNAME,
-                        'test-with-log-files/old/boehm-gc.sum'])
+                        'testdata/with-log/old/boehm-gc.sum'])
         self.assertMultiLineEqual(out,
-                                  'test-with-log-files/old/boehm-gc.sum:14: PASS: boehm-gc.c/leak_test.c -O2 execution test\n'
-                                  'test-with-log-files/old/boehm-gc.log:44: PASS: boehm-gc.c/leak_test.c -O2 execution test\n')
+                                  'testdata/with-log/old/boehm-gc.sum:14: PASS: boehm-gc.c/leak_test.c -O2 execution test\n'
+                                  'testdata/with-log/old/boehm-gc.log:44: PASS: boehm-gc.c/leak_test.c -O2 execution test\n')
 
     def test_find_below_directory(self):
-        out = self.cmd(['find', self.TESTNAME, 'test-with-log-files'])
+        out = self.cmd(['find', self.TESTNAME, 'testdata/with-log'])
         self.assertMultiLineEqual(out,
-                                  'test-with-log-files/new/boehm-gc.sum:14: PASS: boehm-gc.c/leak_test.c -O2 execution test\n'
-                                  'test-with-log-files/new/boehm-gc.log:44: PASS: boehm-gc.c/leak_test.c -O2 execution test\n'
-                                  'test-with-log-files/old/boehm-gc.sum:14: PASS: boehm-gc.c/leak_test.c -O2 execution test\n'
-                                  'test-with-log-files/old/boehm-gc.log:44: PASS: boehm-gc.c/leak_test.c -O2 execution test\n')
+                                  'testdata/with-log/new/boehm-gc.sum:14: PASS: boehm-gc.c/leak_test.c -O2 execution test\n'
+                                  'testdata/with-log/new/boehm-gc.log:44: PASS: boehm-gc.c/leak_test.c -O2 execution test\n'
+                                  'testdata/with-log/old/boehm-gc.sum:14: PASS: boehm-gc.c/leak_test.c -O2 execution test\n'
+                                  'testdata/with-log/old/boehm-gc.log:44: PASS: boehm-gc.c/leak_test.c -O2 execution test\n')
 
     def test_without_log_file(self):
         '''
@@ -1375,9 +1375,9 @@ class TestFind(CommandTest):
         '''
         out = self.cmd(['find',
                         'g++.old-deja/g++.warn/cast-align1.C  -std=gnu++11',
-                        'control'])
-        self.assertMultiLineEqual(out,
-                                  'control/g++.sum:124888: UNSUPPORTED: g++.old-deja/g++.warn/cast-align1.C  -std=gnu++11\n')
+                        'testdata/control'])
+        EXP = 'testdata/control/g++.sum:124888: UNSUPPORTED: g++.old-deja/g++.warn/cast-align1.C  -std=gnu++11\n'
+        self.assertMultiLineEqual(out, EXP)
 
 
 class TestSummarize(CommandTest):
@@ -1385,25 +1385,25 @@ class TestSummarize(CommandTest):
     Integration testing for the "summarize" command
     """
     def test_summarize_one_file(self):
-        out = self.cmd(['summarize', 'test-with-log-files/old/boehm-gc.sum'])
+        out = self.cmd(['summarize', 'testdata/with-log/old/boehm-gc.sum'])
         self.assertMultiLineEqual(out,
-                                  'test-with-log-files/old/boehm-gc.sum\n'
-                                  '------------------------------------\n'
+                                  'testdata/with-log/old/boehm-gc.sum\n'
+                                  '----------------------------------\n'
                                   '\n'
                                   ' PASS: 12 tests\n'
                                   ' UNSUPPORTED: 1 tests\n'
                                   '\n')
 
     def test_summarize_directory(self):
-        out = self.cmd(['summarize', 'test-changing-linenums'])
+        out = self.cmd(['summarize', 'testdata/changing-linenums'])
         self.assertMultiLineEqual(out,
-                                  'test-changing-linenums/new/build/gcc/testsuite/g++/g++.sum\n'
-                                  '----------------------------------------------------------\n'
+                                  'testdata/changing-linenums/new/build/gcc/testsuite/g++/g++.sum\n'
+                                  '--------------------------------------------------------------\n'
                                   '\n'
                                   ' PASS: 379 tests\n'
                                   '\n'
-                                  'test-changing-linenums/old/build/gcc/testsuite/g++/g++.sum\n'
-                                  '----------------------------------------------------------\n'
+                                  'testdata/changing-linenums/old/build/gcc/testsuite/g++/g++.sum\n'
+                                  '--------------------------------------------------------------\n'
                                   '\n'
                                   ' PASS: 369 tests\n'
                                   '\n')
