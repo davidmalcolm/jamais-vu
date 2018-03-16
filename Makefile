@@ -1,3 +1,5 @@
+all: pep8 test
+
 test:
 	./jv test
 
