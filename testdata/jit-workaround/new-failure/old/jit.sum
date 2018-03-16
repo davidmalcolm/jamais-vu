@@ -1,0 +1,39 @@
+Test Run By david on Thu Mar 15 12:21:09 2018
+Native configuration is x86_64-pc-linux-gnu
+
+		=== jit tests ===
+
+Schedule of variations:
+    unix
+
+Running target unix
+Running /home/david/coding-3/gcc-git-bugfixing/src/gcc/testsuite/jit.dg/jit.exp ...
+PASS: jit.dg/test-factorial.c, initial compilation
+PASS:  test-factorial.c.exe iteration 1 of 5: set_up_logging: logfile is non-null
+PASS:  test-factorial.c.exe iteration 1 of 5: verify_code: result is non-null
+PASS:  test-factorial.c.exe iteration 1 of 5: verify_code: my_factorial is non-null
+PASS:  test-factorial.c.exe iteration 1 of 5: verify_code: actual: val == expected: 3628800
+PASS:  test-factorial.c.exe iteration 2 of 5: set_up_logging: logfile is non-null
+PASS:  test-factorial.c.exe iteration 2 of 5: verify_code: result is non-null
+PASS:  test-factorial.c.exe iteration 2 of 5: verify_code: my_factorial is non-null
+PASS:  test-factorial.c.exe iteration 2 of 5: verify_code: actual: val == expected: 3628800
+PASS:  test-factorial.c.exe iteration 3 of 5: set_up_logging: logfile is non-null
+PASS:  test-factorial.c.exe iteration 3 of 5: verify_code: result is non-null
+PASS:  test-factorial.c.exe iteration 3 of 5: verify_code: my_factorial is non-null
+PASS:  test-factorial.c.exe iteration 3 of 5: verify_code: actual: val == expected: 3628800
+PASS:  test-factorial.c.exe iteration 4 of 5: set_up_logging: logfile is non-null
+PASS:  test-factorial.c.exe iteration 4 of 5: verify_code: result is non-null
+PASS:  test-factorial.c.exe iteration 4 of 5: verify_code: my_factorial is non-null
+PASS:  test-factorial.c.exe iteration 4 of 5: verify_code: actual: val == expected: 3628800
+PASS:  test-factorial.c.exe iteration 5 of 5: set_up_logging: logfile is non-null
+PASS:  test-factorial.c.exe iteration 5 of 5: verify_code: result is non-null
+PASS:  test-factorial.c.exe iteration 5 of 5: verify_code: my_factorial is non-null
+PASS:  test-factorial.c.exe iteration 5 of 5: verify_code: actual: val == expected: 3628800
+PASS: test-factorial.c.exe exited cleanly
+PASS: found generated reproducer: test-factorial.c.exe.reproducer.c
+PASS: generated reproducer from jit.dg/test-factorial.c, initial compilation
+PASS: jit.dg/test-factorial.c (test for excess errors)
+
+		=== jit Summary ===
+
+# of expected passes		25
