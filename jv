@@ -1270,12 +1270,13 @@ class CommandTest(unittest.TestCase):
     """
     def cmd(self, args):
         """
-        Run jv.main with the given args, returning the captured stdout.
+        Run jv.main with the given args, returning a
+        (captured stdout, result) pair.
         """
         jv = JV()
         with mock_stdout() as fake_stdout:
-            jv.main(['jv'] + args)
-        return fake_stdout.getvalue()
+            result = jv.main(['jv'] + args)
+        return fake_stdout.getvalue(), result
 
 
 class TestComparisonCommand(CommandTest):
@@ -1283,9 +1284,9 @@ class TestComparisonCommand(CommandTest):
     Integration testing for the "compare" command
     """
     def test_compare_files(self):
-        out = self.cmd(['compare',
-                        'testdata/with-log/old/boehm-gc.sum',
-                        'testdata/with-log/new/boehm-gc.sum'])
+        out, result = self.cmd(['compare',
+                                'testdata/with-log/old/boehm-gc.sum',
+                                'testdata/with-log/new/boehm-gc.sum'])
         self.assertMultiLineEqual(out,
                                   'Comparing 1 common .sum files\n'
                                   '-----------------------------\n'
@@ -1293,11 +1294,12 @@ class TestComparisonCommand(CommandTest):
                                   ' boehm-gc.sum : total: 13 PASS: 12 UNSUPPORTED: 1\n'
                                   '\n'
                                   'No differences found in 1 common .sum files\n')
+        self.assertEqual(result, 0)
 
     def test_compare_directory(self):
-        out = self.cmd(['compare',
-                        'testdata/with-log/old',
-                        'testdata/with-log/new'])
+        out, result = self.cmd(['compare',
+                                'testdata/with-log/old',
+                                'testdata/with-log/new'])
         self.assertMultiLineEqual(out,
                                   'Comparing 1 common .sum files\n'
                                   '-----------------------------\n'
@@ -1305,11 +1307,12 @@ class TestComparisonCommand(CommandTest):
                                   ' boehm-gc.sum : total: 13 PASS: 12 UNSUPPORTED: 1\n'
                                   '\n'
                                   'No differences found in 1 common .sum files\n')
+        self.assertEqual(result, 0)
 
     def test_jit_workaround_clean(self):
-        out = self.cmd(['compare',
-                        'testdata/jit-workaround/clean/old',
-                        'testdata/jit-workaround/clean/new'])
+        out, result = self.cmd(['compare',
+                                'testdata/jit-workaround/clean/old',
+                                'testdata/jit-workaround/clean/new'])
         self.assertMultiLineEqual(out,
                                   'Comparing 1 common .sum files\n'
                                   '-----------------------------\n'
@@ -1317,11 +1320,12 @@ class TestComparisonCommand(CommandTest):
                                   ' jit.sum : total: 2 PASS: 2\n'
                                   '\n'
                                   'No differences found in 1 common .sum files\n')
+        self.assertEqual(result, 0)
 
     def test_jit_workaround_new_failure(self):
-        out = self.cmd(['compare',
-                        'testdata/jit-workaround/new-failure/old',
-                        'testdata/jit-workaround/new-failure/new'])
+        out, result = self.cmd(['compare',
+                                'testdata/jit-workaround/new-failure/old',
+                                'testdata/jit-workaround/new-failure/new'])
         self.assertMultiLineEqual(out,
                                   'Comparing 1 common .sum files\n'
                                   '-----------------------------\n'
@@ -1341,11 +1345,13 @@ class TestComparisonCommand(CommandTest):
                                   '  FAIL: 0->2 (+2)\n'
                                   '  PASS: 25->7 (-18) 28.00%\n'
                                   '\n')
+        self.assertEqual(result, 2)
 
     def test_new_failures(self):
-        out = self.cmd(['compare',
-                        'testdata/new-failures/old',
-                        'testdata/new-failures/new'])
+        out, result = self.cmd(['compare',
+                                'testdata/new-failures/old',
+                                'testdata/new-failures/new'])
+        self.assertEqual(result, 14)
         self.assertIn('Tests appeared in gcc.sum: FAIL: 2, PASS: 12\n', out)
 
 
@@ -1353,7 +1359,7 @@ class TestDump(CommandTest):
     """
     Integration testing for the "dump" command
     """
-    def verify_output(self, out):
+    def verify_output(self, out, result):
         start = get_first_lines(out, 7)
         self.assertMultiLineEqual(start,
                                   'testdata/control/g++.sum\n'
@@ -1365,14 +1371,15 @@ class TestDump(CommandTest):
                                   '  g++.dg/ipa/devirt-22.C  -std=gnu++11  scan-ipa-dump-times cp "Discovered a virtual call to'
                                   ' a known target" 1 (found 2 times)\n')
         self.assertIn('PASS: 119872 tests', out)
+        self.assertEqual(result, None)
 
     def test_dumping_one_file(self):
-        out = self.cmd(['dump', 'testdata/control/g++.sum'])
-        self.verify_output(out)
+        out, result = self.cmd(['dump', 'testdata/control/g++.sum'])
+        self.verify_output(out, result)
 
     def test_dumping_directory(self):
-        out = self.cmd(['dump', 'testdata/control'])
-        self.verify_output(out)
+        out, result = self.cmd(['dump', 'testdata/control'])
+        self.verify_output(out, result)
 
 
 class TestFind(CommandTest):
@@ -1382,29 +1389,32 @@ class TestFind(CommandTest):
     TESTNAME = 'boehm-gc.c/leak_test.c -O2 execution test'
 
     def test_find_within_one_file(self):
-        out = self.cmd(['find', self.TESTNAME,
-                        'testdata/with-log/old/boehm-gc.sum'])
+        out, result = self.cmd(['find', self.TESTNAME,
+                                'testdata/with-log/old/boehm-gc.sum'])
         self.assertMultiLineEqual(out,
                                   'testdata/with-log/old/boehm-gc.sum:14: PASS: boehm-gc.c/leak_test.c -O2 execution test\n'
                                   'testdata/with-log/old/boehm-gc.log:44: PASS: boehm-gc.c/leak_test.c -O2 execution test\n')
+        self.assertEqual(result, 2)
 
     def test_find_below_directory(self):
-        out = self.cmd(['find', self.TESTNAME, 'testdata/with-log'])
+        out, result = self.cmd(['find', self.TESTNAME, 'testdata/with-log'])
         self.assertMultiLineEqual(out,
                                   'testdata/with-log/new/boehm-gc.sum:14: PASS: boehm-gc.c/leak_test.c -O2 execution test\n'
                                   'testdata/with-log/new/boehm-gc.log:44: PASS: boehm-gc.c/leak_test.c -O2 execution test\n'
                                   'testdata/with-log/old/boehm-gc.sum:14: PASS: boehm-gc.c/leak_test.c -O2 execution test\n'
                                   'testdata/with-log/old/boehm-gc.log:44: PASS: boehm-gc.c/leak_test.c -O2 execution test\n')
+        self.assertEqual(result, 4)
 
     def test_without_log_file(self):
-        '''
+        """
         Verify 'find' on a .sum file that's missing its .log file.
-        '''
-        out = self.cmd(['find',
-                        'g++.old-deja/g++.warn/cast-align1.C  -std=gnu++11',
-                        'testdata/control'])
+        """
+        out, result = self.cmd(['find',
+                                'g++.old-deja/g++.warn/cast-align1.C  -std=gnu++11',
+                                'testdata/control'])
         EXP = 'testdata/control/g++.sum:124888: UNSUPPORTED: g++.old-deja/g++.warn/cast-align1.C  -std=gnu++11\n'
         self.assertMultiLineEqual(out, EXP)
+        self.assertEqual(result, 1)
 
 
 class TestSummarize(CommandTest):
@@ -1412,7 +1422,7 @@ class TestSummarize(CommandTest):
     Integration testing for the "summarize" command
     """
     def test_summarize_one_file(self):
-        out = self.cmd(['summarize', 'testdata/with-log/old/boehm-gc.sum'])
+        out, result = self.cmd(['summarize', 'testdata/with-log/old/boehm-gc.sum'])
         self.assertMultiLineEqual(out,
                                   'testdata/with-log/old/boehm-gc.sum\n'
                                   '----------------------------------\n'
@@ -1420,9 +1430,10 @@ class TestSummarize(CommandTest):
                                   ' PASS: 12 tests\n'
                                   ' UNSUPPORTED: 1 tests\n'
                                   '\n')
+        self.assertEqual(result, None)
 
     def test_summarize_directory(self):
-        out = self.cmd(['summarize', 'testdata/changing-linenums'])
+        out, result = self.cmd(['summarize', 'testdata/changing-linenums'])
         self.assertMultiLineEqual(out,
                                   'testdata/changing-linenums/new/build/gcc/testsuite/g++/g++.sum\n'
                                   '--------------------------------------------------------------\n'
@@ -1434,7 +1445,7 @@ class TestSummarize(CommandTest):
                                   '\n'
                                   ' PASS: 369 tests\n'
                                   '\n')
-
+        self.assertEqual(result, None)
 
 if __name__ == "__main__":
     jv = JV()
