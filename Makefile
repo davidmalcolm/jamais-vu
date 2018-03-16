@@ -4,9 +4,9 @@ test:
 	./jv test
 
 compare-changing-linenums:
-	./jv compare test-changing-linenums/old test-changing-linenums/new \
-	  --old-source-path=test-changing-linenums/old/src \
-	  --new-source-path=test-changing-linenums/new/src
+	./jv compare testdata/changing-linenums/old testdata/changing-linenums/new \
+	  --old-source-path=testdata/changing-linenums/old/src \
+	  --new-source-path=testdata/changing-linenums/new/src
 
 jit-workaround-clean:
 	./jv compare testdata/jit-workaround/clean/old testdata/jit-workaround/clean/new
