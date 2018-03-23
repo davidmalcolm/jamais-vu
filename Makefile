@@ -8,6 +8,11 @@ compare-changing-linenums:
 	  --old-source-path=testdata/changing-linenums/old/src \
 	  --new-source-path=testdata/changing-linenums/new/src
 
+compare-changing-linenums-2:
+	./jv compare testdata/changing-linenums-2/old testdata/changing-linenums-2/new \
+	  --old-source-path=testdata/changing-linenums-2/old/src \
+	  --new-source-path=testdata/changing-linenums-2/new/src
+
 jit-workaround-clean:
 	./jv compare testdata/jit-workaround/clean/old testdata/jit-workaround/clean/new
 

@@ -48,6 +48,15 @@ def locate_exp_files(source_path):
 ############################################################################
 
 
+class LineNumInfo(namedtuple('LineNumInfo',
+                             ['filename', 'details', 'index', 'start_line', 'end_line'])):
+    """
+    A named 5-tuple for the result of TestId.get_line_num_info; see the description
+    of that method.
+    """
+    pass
+
+
 class TestId(namedtuple('TestId', ['testname', 'index'])):
     """
     A (name, index) pair, identifying e.g. one instance of
@@ -56,27 +65,29 @@ class TestId(namedtuple('TestId', ['testname', 'index'])):
     """
     def get_line_num_info(self):
         """
-        Get a (filename, details, start_line, end_line) 4-tuple for use
-        when discarding test results that merely changed line.
+        Get a LineNumInfo for use when discarding test results that merely changed line.
 
         Return None if the testname doesn't contain any line numbers.
 
-        For example, given this testname:
-          "g++.dg/diagnostic/param-type-mismatch.C  -std=gnu++11  (test for errors, line 106)"
+        For example, given this TestId:
+          ("g++.dg/diagnostic/param-type-mismatch.C  -std=gnu++11  (test for errors, line 106)",
+           index=1)
         return:
-          ('g++.dg/diagnostic/param-type-mismatch.C',
-           '  -std=gnu++11  (test for errors',
-           106,
-           106)
-        and given this testname:
+          LineNumInfo('g++.dg/diagnostic/param-type-mismatch.C',
+                      '  -std=gnu++11  (test for errors',
+                      1,
+                      106,
+                      106)
+        and given this TestId:
           ('g++.dg/diagnostic/param-type-mismatch.C  -std=gnu++11  expected multiline pattern lines 108-109 was found: "   '
-           'return ptr->member_1 \(first, second, third\);.*\n                                             \^\n')
+           'return ptr->member_1 \(first, second, third\);.*\n                                             \^\n', 0)
         return:
-          ('g++.dg/diagnostic/param-type-mismatch.C',
-           '  -std=gnu++11  expected multiline pattern lines    return ptr->member_1 \\(first, second, third\\);.*\\n      '
-           '                                       \\^\\n',
-           108,
-           109)
+          LineNumInfo('g++.dg/diagnostic/param-type-mismatch.C',
+                      '  -std=gnu++11  expected multiline pattern lines    return ptr->member_1 \\(first, second, third\\);'
+                      '.*\\n                                             \\^\\n',
+                      0,
+                      108,
+                      109)
         and given this testname w/o any line numbers:
           'g++.dg/diagnostic/nested-name-1.C  -std=gnu++98 (test for excess errors)'
         return None
@@ -85,13 +96,13 @@ class TestId(namedtuple('TestId', ['testname', 'index'])):
         if m:
             filename, details, linenum = m.groups()
             linenum = int(linenum)
-            return filename, details, linenum, linenum
+            return LineNumInfo(filename, details, self.index, linenum, linenum)
         m = re.match('(\S+)(.*expected multiline pattern lines )([0-9]+)-([0-9]+) was found: "(.*)"',
                      self.testname)
         if m:
             filename, details_a, linenum_a, linenum_b, details_b = m.groups()
-            return (filename, details_a + details_b,
-                    int(linenum_a), int(linenum_b))
+            return LineNumInfo(filename, details_a + details_b, self.index,
+                               int(linenum_a), int(linenum_b))
 
 
 class DejaFile:
@@ -210,7 +221,7 @@ class DejaFile:
             line_num_info = testid.get_line_num_info()
             if not line_num_info:
                 continue
-            filename, details, linenum_a, linenum_b = line_num_info
+            filename = line_num_info.filename
             if filename in result:
                 continue
             src = self.locate_source_file(filename)
@@ -435,6 +446,21 @@ class LineMatcher:
                 linenumB = zero_based_linenumB + 1
                 return linenumB
 
+    def remap_line_num_info(self, line_num_infoA):
+        """
+        Given a LineNumInfo in filenameA, attempt to locate
+        the corresponding LineNumInfo in filenameB, or return None.
+        """
+        expected_start_lineB = self.get(line_num_infoA.start_line)
+        if expected_start_lineB is None:
+            return None
+        expected_end_lineB = self.get(line_num_infoA.end_line)
+        if expected_end_lineB is None:
+            return None
+        return LineNumInfo(line_num_infoA.filename, line_num_infoA.details,
+                           line_num_infoA.index,
+                           expected_start_lineB, expected_end_lineB)
+
 
 def remap_for_changing_line_numbers(sumfileA, testidsA,
                                     sumfileB, testidsB):
@@ -461,7 +487,7 @@ def remap_for_changing_line_numbers(sumfileA, testidsA,
         line_num_infoA = testidA.get_line_num_info()
         if not line_num_infoA:
             continue
-        filenameA, detailsA, startlineA, endlineA = line_num_infoA
+        filenameA = line_num_infoA.filename
         if filenameA not in missing_files:
             continue
         if filenameA not in new_files:
@@ -471,20 +497,15 @@ def remap_for_changing_line_numbers(sumfileA, testidsA,
                 = LineMatcher(missing_files[filenameA],
                               new_files[filenameA])
         lm = line_matchers_by_filename[filenameA]
-        expected_startlineB = lm.get(startlineA)
-        if expected_startlineB is None:
-            continue
-        expected_endlineB = lm.get(endlineA)
-        if expected_endlineB is None:
+        line_num_info_remapped = lm.remap_line_num_info(line_num_infoA)
+        if line_num_info_remapped is None:
             continue
         # TODO: avoid O(N^2) here?
         for testidB in new:
             line_num_infoB = testidB.get_line_num_info()
             if not line_num_infoB:
                 continue
-            filenameB, detailsB, startlineB, endlineB = line_num_infoB
-            if (filenameA, detailsA, expected_startlineB, expected_endlineB) \
-               != (filenameB, detailsB, startlineB, endlineB):
+            if line_num_info_remapped != line_num_infoB:
                 continue
 
             assert testidA in sumfileA.testid_to_outcome
@@ -498,8 +519,13 @@ def remap_for_changing_line_numbers(sumfileA, testidsA,
             # This test changed line, but the outcome is unchanged;
             # drop it from the set of changes.
             if 0:
-                print('test changed line: A: %r B: %r'
-                      % (line_num_infoA, line_num_infoB))
+                print('test changed line:\n'
+                      '  A: %r\n'
+                      '     %r\n'
+                      '  B: %r\n'
+                      '     %r\n'
+                      % (testidA, line_num_infoA,
+                         testidB, line_num_infoB))
             testidsA.remove(testidA)
             testidsB.remove(testidB)
             break
@@ -1134,6 +1160,7 @@ class TestRemappingLineNumbers(unittest.TestCase):
         self.assertEqual(testid.get_line_num_info(),
                          ('g++.dg/diagnostic/param-type-mismatch.C',
                           '  -std=gnu++11  (test for errors',
+                          0,
                           106, 106))
 
         TESTNAME_2 = (r'g++.dg/diagnostic/param-type-mismatch.C  -std=gnu++11  expected multiline pattern lines 108-109'
@@ -1144,6 +1171,7 @@ class TestRemappingLineNumbers(unittest.TestCase):
                          ('g++.dg/diagnostic/param-type-mismatch.C',
                           ('  -std=gnu++11  expected multiline pattern lines    return ptr->member_1 \\(first, second, '
                            'third\\);.*\\n                                             \\^\\n'),
+                          0,
                           108, 109))
 
         TESTNAME_3 = 'g++.dg/diagnostic/nested-name-1.C  -std=gnu++98 (test for excess errors)'
@@ -1229,6 +1257,20 @@ class TestRemappingLineNumbers(unittest.TestCase):
         self.assertEqual(testidsA, set([testidA]))
         self.assertEqual(testidsB, set([testidB]))
 
+    def test_remap_for_changing_line_numbers_2(self):
+        """
+        Regression test for a case that led to a KeyError exception.
+        """
+        sumfileA = SumFile('testdata/changing-linenums-2/old/g++.sum',
+                           source_path='testdata/changing-linenums-2/old/src')
+        sumfileB = SumFile('testdata/changing-linenums-2/new/g++.sum',
+                           source_path='testdata/changing-linenums-2/new/src')
+        testidsA = set(sumfileA.testid_to_outcome.keys())
+        testidsB = set(sumfileB.testid_to_outcome.keys())
+        testidsA, testidsB \
+            = remap_for_changing_line_numbers(sumfileA, testidsA,
+                                              sumfileB, testidsB)
+
 
 class TestComparisonWithSource(unittest.TestCase):
     """
@@ -1261,6 +1303,40 @@ class TestComparisonWithSource(unittest.TestCase):
                                   '\n'
                                   '  # of .sum files: 1\n'
                                   '  PASS: 369->379 (+10) 102.71%\n'
+                                  '\n')
+
+
+class TestComparisonWithSource2(unittest.TestCase):
+    """
+    Another example of suppressing tests that merely changed line number;
+    this one a regression test for a backtrace.
+    """
+    @classmethod
+    def setUpClass(cls):
+        cls.c = Comparison('testdata/changing-linenums-2/old/g++.sum', 'testdata/changing-linenums-2/old/src',
+                           'testdata/changing-linenums-2/new/g++.sum', 'testdata/changing-linenums-2/new/src')
+
+    def test_compare_sum_files(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.compare_sum_files(tr)
+        self.assertIn('g++.sum : total: 57->60 (+3) PASS: 57->60 (+3)\n',
+                      fake_stdout.getvalue())
+        self.assertIn('Tests that went away in g++.sum: PASS: 6',
+                      fake_stdout.getvalue())  # would be 18 without suppression
+        self.assertIn('Tests appeared in g++.sum: PASS: 9',
+                      fake_stdout.getvalue())  # would be 21 without suppression
+
+    def test_conclusion(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.conclusion(tr)
+        self.assertMultiLineEqual(fake_stdout.getvalue(),
+                                  'Summary\n'
+                                  '-------\n'
+                                  '\n'
+                                  '  # of .sum files: 1\n'
+                                  '  PASS: 57->60 (+3) 105.26%\n'
                                   '\n')
 
 
