@@ -105,6 +105,16 @@ class TestId(namedtuple('TestId', ['testname', 'index'])):
                                int(linenum_a), int(linenum_b))
 
 
+class Error(namedtuple('Error', ['text', 'linenum'])):
+    pass
+
+# gcc/testsuite/ada/acats/acats.sum uses a tab rather than a space
+# e.g. 'PASS:\ta22006b\n'
+PATTERN_PAIRS = [(outcome, re.compile('^%s:\s+(\S.*)$' % outcome))
+                 for outcome in OUTCOMES]
+ERROR_PATTERN = re.compile('^ERROR:\s+(\S.*)$')
+
+
 class DejaFile:
     """
     Output from dejagnu, either a .log or a .sum file
@@ -133,16 +143,17 @@ class DejaFile:
         # Mapping from test name to last numeric index
         self.testname_to_last_index = {}
 
+        # List of Error instances.  We track these separately since, if
+        # an error occurs, it's likely to dramatically affect the other
+        # results (e.g. everything after it in the same parallel-tested
+        # shard won't be run)
+        self.errors = []
+
         # Parse the file and build the above dicts:
         with open(self.path) as f:
             self.parse_file(f)
 
     def parse_file(self, f):
-        # gcc/testsuite/ada/acats/acats.sum uses a tab rather than a space
-        # e.g. 'PASS:\ta22006b\n'
-        PATTERN_PAIRS = [(outcome, re.compile('^%s:\s+(\S.*)$' % outcome))
-                         for outcome in OUTCOMES]
-
         for idx, line in enumerate(f):
             for outcome, PATTERN in PATTERN_PAIRS:
                 m = re.match(PATTERN, line)
@@ -159,6 +170,9 @@ class DejaFile:
                     self.testid_to_lineidx[testid] = idx
                     self.outcome_to_testids[outcome].add(testid)
                     break  # OUTCOMES loop
+            m = re.match(ERROR_PATTERN, line)
+            if m:
+                self.errors.append(Error(m.group(1), idx + 1))
 
     def find(self, search_testname):
         result = 0
@@ -549,6 +563,9 @@ class Comparison:
         self.total_by_outcomeA = TotalByOutcome()
         self.total_by_outcomeB = TotalByOutcome()
 
+        self.error_countA = 0
+        self.error_countB = 0
+
         self.issue_count = 0
 
     def print_missing_sum_files(self, tr):
@@ -594,6 +611,13 @@ class Comparison:
             outcome_text = make_count_text('total',
                                            len(sumfileA.testid_to_outcome),
                                            len(sumfileB.testid_to_outcome))
+
+            if sumfileA.errors or sumfileB.errors:
+                outcome_text += make_count_text('ERROR', len(sumfileA.errors),
+                                                len(sumfileB.errors))
+            self.error_countA += len(sumfileA.errors)
+            self.error_countB += len(sumfileB.errors)
+
             for outcome in OUTCOMES:
                 countA = sumfileA.get_count_by_outcome(outcome)
                 countB = sumfileB.get_count_by_outcome(outcome)
@@ -602,6 +626,16 @@ class Comparison:
                 self.total_by_outcomeA[outcome] += countA
                 self.total_by_outcomeB[outcome] += countB
             tr.writeln('%s :%s' % (relpath, outcome_text))
+
+    def report_any_errors_in_sumfile(self, sumfile, tr):
+        if not sumfile.errors:
+            return
+
+        tr.begin_section('Errors in %s: %i'
+                         % (sumfile.path, len(sumfile.errors)))
+        for err in sumfile.errors:
+            tr.writeln('%s:%i: %s' % (sumfile.path, err.linenum, err.text))
+        tr.end_section()
 
     def libgccjit_workaround(self, tr, sumfileA, sumfileB):
         """
@@ -631,6 +665,9 @@ class Comparison:
         for relpath in sorted(self.relpathsA & self.relpathsB):
             sumfileA = self.dict_by_rel_pathA[relpath]
             sumfileB = self.dict_by_rel_pathB[relpath]
+
+            self.report_any_errors_in_sumfile(sumfileA, tr)
+            self.report_any_errors_in_sumfile(sumfileB, tr)
 
             if os.path.basename(sumfileA.path) == 'jit.sum':
                 self.libgccjit_workaround(tr, sumfileA, sumfileB)
@@ -690,6 +727,11 @@ class Comparison:
             tr.writeln(make_count_text('# of .sum files',
                                        len(self.relpathsA),
                                        len(self.relpathsB)))
+            if self.error_countA or self.error_countB:
+                tr.writeln(make_count_text('ERROR',
+                                           self.error_countA,
+                                           self.error_countB,
+                                           False))
             for outcome in OUTCOMES:
                 countA = self.total_by_outcomeA[outcome]
                 countB = self.total_by_outcomeB[outcome]
@@ -1337,6 +1379,62 @@ class TestComparisonWithSource2(unittest.TestCase):
                                   '\n'
                                   '  # of .sum files: 1\n'
                                   '  PASS: 57->60 (+3) 105.26%\n'
+                                  '\n')
+
+
+class TestComparisonWithErrors(unittest.TestCase):
+    """
+    Verify that errors are detected and shown prominently.
+    """
+    @classmethod
+    def setUpClass(cls):
+        cls.c = SourcelessComparison('testdata/error-detection/old',
+                                     'testdata/error-detection/new')
+
+    def test_compare_sum_files(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.compare_sum_files(tr)
+        EXPECTED = (
+            'Comparing 1 common .sum files\n'
+            '-----------------------------\n'
+            '\n'
+            ' g++.sum : total: 4->3 (-1) ERROR: 2 PASS: 4->3 (-1)\n'
+            '\n'
+            'Errors in testdata/error-detection/old/g++.sum: 2\n'
+            '-------------------------------------------------\n'
+            '\n'
+            ' testdata/error-detection/old/g++.sum:2:'
+            + " couldn't compile regular expression pattern: quantifier operand invalid\n"
+            ' testdata/error-detection/old/g++.sum:3: tcl error sourcing'
+            ' /home/david/coding-3/gcc-build/test/control/src/gcc/testsuite/g++.dg/lto/lto.exp.\n'
+            '\n'
+            'Errors in testdata/error-detection/new/g++.sum: 2\n'
+            '-------------------------------------------------\n'
+            '\n'
+            ' testdata/error-detection/new/g++.sum:2:'
+            + " couldn't compile regular expression pattern: quantifier operand invalid\n"
+            ' testdata/error-detection/new/g++.sum:3:'
+            + ' tcl error sourcing /home/david/coding-3/gcc-build/test/experiment/src/gcc/testsuite/g++.dg/lto/lto.exp.\n'
+            '\n'
+            'Tests that went away in g++.sum: PASS: 1\n'
+            '----------------------------------------\n'
+            '\n'
+            ' PASS: ./array-1.H  -O2 (test for excess errors)\n'
+            '\n')
+        self.assertMultiLineEqual(fake_stdout.getvalue(), EXPECTED)
+
+    def test_conclusion(self):
+        with mock_stdout() as fake_stdout:
+            tr = TextReporter()
+            self.c.conclusion(tr)
+        self.assertMultiLineEqual(fake_stdout.getvalue(),
+                                  'Summary\n'
+                                  '-------\n'
+                                  '\n'
+                                  '  # of .sum files: 1\n'
+                                  '  ERROR: 2\n'
+                                  '  PASS: 4->3 (-1) 75.00%\n'
                                   '\n')
 
 

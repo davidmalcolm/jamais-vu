@@ -1,0 +1,7 @@
+Running /home/david/coding-3/gcc-build/test/experiment/src/gcc/testsuite/g++.dg/lto/lto.exp ...
+ERROR: couldn't compile regular expression pattern: quantifier operand invalid
+ERROR: tcl error sourcing /home/david/coding-3/gcc-build/test/experiment/src/gcc/testsuite/g++.dg/lto/lto.exp.
+Running /home/david/coding-3/gcc-build/test/experiment/src/gcc/testsuite/g++.dg/pch/pch.exp ...
+PASS: ./array-1.H  -O2 (test for excess errors)
+PASS: ./array-1.H  -O2 -g (test for excess errors)
+PASS: ./array-1.H  -g (test for excess errors)

@@ -22,5 +22,8 @@ jit-workaround-new-failure:
 new-failure:
 	./jv compare testdata/new-failures/old/gcc.sum testdata/new-failures/new/gcc.sum
 
+error-detection:
+	./jv compare testdata/error-detection/old/g++.sum testdata/error-detection/new/g++.sum
+
 pep8:
 	python3-pep8 jv
